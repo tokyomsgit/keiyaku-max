@@ -27,8 +27,8 @@ description: 重要事項調査報告書（重調）の読取・Supabase保存�
 `approve 資料版UUID --fields 標準field_code --reviewed-by 確認者` で承認する。
 画像・根拠不一致の値は原本との照合後に限り `--verified-against-original` を使用する。
 承認後は `export 資料版UUID ひな形.xlsm -o 出力.xlsm` で反映する。
-名前定義がない項目を固定セルへ書かない。現行正式ひな形では重調の対応名前定義がないため、
-DB保存＋要確認表示までになることを伝える。詳細はリポジトリの `IMPORTANT_REPORT_ADMIN.md`。
+名前定義がない項目を固定セルへ書かない。現行正式ひな形では物件名・号室の2項目が対応する。
+それ以外はDB保存＋要確認表示まで。承認済みでも低confidence・根拠不明・needs_review=trueの値は転記しない。詳細はリポジトリの `IMPORTANT_REPORT_ADMIN.md`。
 
 ### 謄本の場合（既存処理）
 

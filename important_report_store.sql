@@ -36,6 +36,8 @@ insert into public.field_master(field_code,label_ja,entity_level,data_type,prima
 ('other_monthly_fees','対象住戸のその他月額費用','unit','json','important_report',true,true),
 ('fee_payment_info','管理費等の支払方法','unit','json','important_report',true,true)
 on conflict(field_code) do nothing;
+update public.field_master set excel_named_range='重調_building_name' where field_code='building_name';
+update public.field_master set excel_named_range='重調_unit_name' where field_code='unit_name';
 alter table public.document_versions add column if not exists important_import_key text;
 alter table public.document_versions add column if not exists important_raw_json jsonb;
 alter table public.document_versions add column if not exists important_baseline jsonb;
@@ -139,7 +141,7 @@ end $fn$;
 create or replace function public.get_approved_important_report(p jsonb)
 returns jsonb language sql security invoker set search_path='' as $fn$
  select jsonb_build_object('document_version_id',p->>'document_version_id','fields',coalesce(jsonb_object_agg(e.field_code,jsonb_build_object(
- 'value',e.value,'approved',true,'source_text',e.source_text,'page_no',e.page_no,'value_as_of_date',e.value_as_of_date,'document_version_id',e.document_version_id)) filter(where e.field_code is not null),'{}'))
+ 'value',e.value,'approved',true,'confidence',e.confidence,'needs_review',coalesce((v.important_raw_json->'fields'->e.field_code->>'needs_review')::boolean,true),'source_text',e.source_text,'page_no',e.page_no,'value_as_of_date',e.value_as_of_date,'document_version_id',e.document_version_id)) filter(where e.field_code is not null),'{}'))
  from public.document_versions v join public.documents d using(document_id)
  join public.extracted_values e using(document_version_id)
  where v.document_version_id=(p->>'document_version_id')::uuid and d.document_type='important_report' and d.unit_id is not null and e.approved;

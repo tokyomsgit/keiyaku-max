@@ -1,0 +1,12 @@
+{
+  "重調_building_name": {
+    "reference": "'基本入力'!$AB$13",
+    "label_cell": "X13",
+    "label": "物件名"
+  },
+  "重調_unit_name": {
+    "reference": "'基本入力'!$AS$13",
+    "label_cell": "AV13",
+    "label": "号室"
+  }
+}

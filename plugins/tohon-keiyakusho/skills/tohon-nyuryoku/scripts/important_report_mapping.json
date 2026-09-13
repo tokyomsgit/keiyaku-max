@@ -3,7 +3,7 @@
     "label": "建物名",
     "entity_level": "building",
     "data_type": "text",
-    "excel_named_range": null,
+    "excel_named_range": "重調_building_name",
     "primary_source": "important_report"
   },
   "display_address": {
@@ -206,8 +206,9 @@
     "label": "対象住戸の部屋番号",
     "entity_level": "unit",
     "data_type": "text",
-    "excel_named_range": null,
-    "primary_source": "important_report"
+    "excel_named_range": "重調_unit_name",
+    "primary_source": "important_report",
+    "excel_transform": "room_number"
   },
   "management_fee": {
     "label": "対象住戸の月額管理費（円）",

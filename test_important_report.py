@@ -77,11 +77,13 @@ class ImportantReportTests(unittest.TestCase):
             w.defined_names.add(DefinedName('試験管理費',attr_text="'基本入力'!$B$2"))
             w.defined_names.add(DefinedName('試験数式',attr_text="'基本入力'!$C$2"));w.save(src)
             fields={'management_fee':{'value':12000,'approved':True},'repair_reserve_fee':{'value':9,'approved':True},'unit_name':{'value':'=cmd','approved':False}}
+
+            for item in fields.values():item.update(confidence=.99,needs_review=False,source_text='確認済み試験値',page_no=1)
             mapping={'management_fee':{'excel_named_range':'試験管理費'},'repair_reserve_fee':{'excel_named_range':'試験数式'}}
             r=write_named_excel(src,out,fields,mapping);self.assertEqual(len(r['written']),1)
             c=load_workbook(out);self.assertEqual(c['基本入力']['B2'].value,12000);self.assertEqual(c['基本入力']['C2'].value,'=B2*2');c.close()
             with zipfile.ZipFile(src) as a,zipfile.ZipFile(out) as b:
-                self.assertEqual([x for x in a.namelist() if a.read(x)!=b.read(x)],['xl/worksheets/sheet1.xml'])
+                self.assertEqual(set(x for x in a.namelist() if a.read(x)!=b.read(x)),{'xl/worksheets/sheet1.xml','xl/workbook.xml'})
             with self.assertRaises(StoreError):write_named_excel(src,out,fields,mapping)
 
     def test_unmapped_does_not_create_contract(self):

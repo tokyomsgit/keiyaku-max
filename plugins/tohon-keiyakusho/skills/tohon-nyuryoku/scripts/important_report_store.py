@@ -87,7 +87,11 @@ def write_named_excel(template, output, approved_fields, mapping=None):
         try:
             for code,item in approved_fields.items():
                 name=mapping.get(code,{}).get('excel_named_range')
-                if not item.get('approved') or item.get('value') is None or not name or len(definitions.get(name,[]))!=1:
+                confidence=item.get('confidence')
+                if (not item.get('approved') or item.get('value') is None or item.get('needs_review') is not False
+                    or isinstance(confidence,bool) or not isinstance(confidence,(int,float)) or not .85<=confidence<=1
+                    or not item.get('source_text') or not item.get('page_no')
+                    or not name or len(definitions.get(name,[]))!=1):
                     skipped.append(code);continue
                 ref=definitions[name][0]
                 match=re.fullmatch(r"(?:'((?:[^']|'')+)'|([^'!]+))!\$?([A-Z]+)\$?(\d+)",ref or '')
@@ -97,12 +101,16 @@ def write_named_excel(template, output, approved_fields, mapping=None):
                 if any(cell in r and cell!=r.start_cell.coordinate for r in wb[sheet].merged_cells.ranges): skipped.append(code);continue
                 target=sheets[sheet]; target=target.lstrip('/') if target.startswith('/') else 'xl/'+target
                 data=patches.get(target,z.read(target).decode('utf8'))
-                pattern=re.compile(r'<c\b(?=[^>]*\br="'+re.escape(cell)+r'")[^>]*(?:/>|>.*?</c>)',re.S)
+                pattern=re.compile(r'<c\b(?=[^>]*\br="'+re.escape(cell)+r'")[^>]*?(?:/>|>.*?</c>)',re.S)
                 matches=list(pattern.finditer(data))
                 if len(matches)!=1: skipped.append(code);continue
                 node=matches[0].group(); opening=node[:node.index('>')+1].rstrip('/>')
                 opening=re.sub(r'\s+t="[^"]*"','',opening)
                 value=item['value']
+                if mapping[code].get('excel_transform')=='room_number':
+                    # The template already prints 号室; retain leading zeroes in the room identifier.
+                    value=re.sub(r'\s*号室$', '', str(value)).strip()
+                    if not value: skipped.append(code);continue
                 if isinstance(value,(int,float)) and not isinstance(value,bool): new=opening+'><v>'+str(value)+'</v></c>'
                 else:
                     value=value if isinstance(value,str) else canonical(value)
@@ -113,6 +121,18 @@ def write_named_excel(template, output, approved_fields, mapping=None):
                 written.append({'field_code':code,'name':name,'sheet':sheet,'cell':cell,'value':value})
         finally: wb.close()
         if not written: return {'output':None,'written':[],'needs_review':skipped,'message':'対応する名前定義がないため、Excelへの反映はありません。'}
+        # External XML edits do not invalidate Excel's formula caches automatically.
+        # Request recalculation on open without changing a single formula or cached value.
+        workbook_text=z.read('xl/workbook.xml').decode('utf8')
+        calc=re.search(r'<calcPr\b[^>]*/>',workbook_text)
+        if calc:
+            updated=calc.group()
+            for attr in ('fullCalcOnLoad','forceFullCalc','calcMode'):
+                updated=re.sub(r'\s+'+attr+r'="[^"]*"','',updated)
+            updated=updated[:-2]+' fullCalcOnLoad="1" forceFullCalc="1" calcMode="auto"/>'
+            patches['xl/workbook.xml']=workbook_text[:calc.start()]+updated+workbook_text[calc.end():]
+        else:
+            raise StoreError('ひな形の再計算設定を確認してください。')
         output.parent.mkdir(parents=True,exist_ok=True)
         with zipfile.ZipFile(output,'x') as dst:
             for info in z.infolist(): dst.writestr(info,patches[info.filename].encode('utf8') if info.filename in patches else z.read(info.filename))

@@ -25,12 +25,20 @@ confirmedは資料の取得状態であり、自動承認ではない。原本�
 基準日不明や古い値による既採用値の置換は停止する。資料全体の発行日で補完しない。
 管理規約との出典優先はmappingのprimary_sourceとdocument_typeで区別可能。
 
-現行正式ひな形の独自名前定義31件は謄本・住居表示用。重調35項目との確実な対応はないため、
-`important_report_mapping.json` のexcel_named_rangeはnull。無理な固定セル転記は行わず、要確認として返す。
-管理者がひな形の対応する名前定義を整備して対応表に登録した項目だけ反映できる。
-対応項目0件の場合は空の契約書コピーを生成しない。元ひな形は変更しない。
+正式ひな形の既存31名前定義を保持し、基本入力の物件名と号室へ以下を追加する。
+
+- `building_name` → `重調_building_name`
+- `unit_name` → `重調_unit_name`（末尾の「号室」だけ除去、先頭ゼロは保持）
+
+名前の付与は `python add_important_report_names.py 元ひな形.xlsm 別名ひな形.xlsm`。
+付与専用の `important_report_template_names.json` が入力欄ラベル・参照先を管理する。
+アプリの転記は `important_report_mapping.json` の名前定義だけを利用し、固定セルを参照しない。
+管理費・修繕積立金等は基本入力に適切な欄がないため、残り33項目はExcel未対応・Supabase保存のみ。
+承認済みでも、needs_reviewがfalseでない値、confidenceが0.85未満または不明な値、根拠不明な値は自動転記しない。
+出力では数式・VBA・書式等を維持し、Excelで開いたときの再計算だけ要求する。
+正式ひな形自体は名前追加以外変更しない。対応項目0件の場合は契約書コピーを生成しない。
 原本はstorage_pathで追跡し、Storageへのアップロードは未実装。OCR画像はメモリ内のみ。
 キャッシュ・原本・出力はGit管理対象外の場所に保存する。
 
-検証: `python -m unittest test_important_report test_supabase_store`。
+検証: `python -m unittest test_important_report test_supabase_store test_important_report_names`。
 `test_important_report_db.sql` は実DBに対して実行でき、試験データをROLLBACKする。
