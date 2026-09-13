@@ -1,3 +1,5 @@
 1. **環境変数設定**：`.env.example`を`.env`へコピー。`DEMO_MODE=true`、`DEMO_WRITE_DB=false`でDB接続もAI呼出しも行いません。`DEMO_REGISTRY_JSON`に既存のClaude形式の中間JSON、`DEMO_EVIDENCE_JSON`に根拠付きintegrated.json、`DEMO_REPORT_JSON`に解析済み重調JSON、`CONTRACT_TEMPLATE`に名前定義付きxlsmを指定。本番は`DEMO_MODE=false`と既存のSupabase環境変数を使用し、管理者が`web_workspace.sql`を一度適用します。`DEMO_WRITE_DB=true`は実DBの読書きを有効にするため、通常の画面確認ではfalseのままにしてください。
 2. **起動方法**：`run_local.bat`をダブルクリック。既存のPython環境（openpyxl）を使います。コマンドでは`python web_app.py`。終了は起動したウィンドウでCtrl+C。デモの採用・保留は起動中のメモリだけに保存され、再起動で戻ります。`DEMO_APPROVED_FIELDS`には、原本確認済みの重調項目だけをカンマ区切りで指定します。
 3. **ブラウザURL**：`http://127.0.0.1:8765`。このPCだけで操作できます。外部へ実データやひな形を公開しません。
+
+公開デモは python build_public_demo.py で生成します。公開対象は public-demo-dist の5ファイルだけです。ダミーデータで動作し、AI・DB接続・Excel生成は行いません。差分の操作は再読込で戻ります。ローカル版は従来どおり起動できます。

@@ -1,5 +1,6 @@
 .DS_Store
 .netlify/
+public-demo-dist/
 __pycache__/
 *.pyc
 *.xlsm
