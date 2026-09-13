@@ -23,7 +23,8 @@ def make_server(workspace,port=8765):
             if filename:
                 from urllib.parse import quote
                 self.send_header('Content-Disposition',"attachment; filename*=UTF-8''"+quote(filename))
-            self.end_headers();self.wfile.write(body)
+            try:self.end_headers();self.wfile.write(body)
+            except (ConnectionError,OSError):pass
         def do_GET(self):
             if not self.allowed():return self.send(403,{'error':'接続先が不正です。'})
             path=urlsplit(self.path).path
@@ -42,6 +43,17 @@ def make_server(workspace,port=8765):
                 return self.send(403,{'error':'画面を再読込してください。'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
+                if urlsplit(self.path).path=='/api/upload-registry':
+                    if not 0<size<=40*1024*1024:raise StoreError('PDF合計サイズは40MB以内にしてください。')
+                    from email.parser import BytesParser
+                    from email.policy import default
+                    from web_registry import upload
+                    content_type=self.headers.get('Content-Type','')
+                    if not content_type.startswith('multipart/form-data'):raise ValueError()
+                    message=BytesParser(policy=default).parsebytes(('Content-Type: '+content_type+'\r\nMIME-Version: 1.0\r\n\r\n').encode()+self.rfile.read(size))
+                    files=[(p.get_filename(),p.get_payload(decode=True)) for p in message.iter_parts() if p.get_filename()]
+                    with workspace.lock:result=upload(workspace,files)
+                    return self.send(200,result)
                 if not 0<size<8192:raise ValueError()
                 p=json.loads(self.rfile.read(size));path=urlsplit(self.path).path
                 if path=='/api/decision':result=workspace.decide(p['case_id'],p['diff_id'],p['action'])
@@ -59,6 +71,16 @@ def make_server(workspace,port=8765):
 
 if __name__=='__main__':
     try:
+        from web_data import load_env
+        load_env()
+        if '--no-browser' not in sys.argv:
+            import urllib.request
+            try:
+                url='http://127.0.0.1:'+str(int(env('WEB_PORT') or '8765'))
+                with urllib.request.urlopen(url+'/api/state',timeout=2) as r:running=json.load(r)
+                if 'cases' in running and 'csrf' in running:
+                    webbrowser.open(url);sys.exit(0)
+            except (OSError,ValueError):pass
         workspace=Workspace();server=make_server(workspace,int(env('WEB_PORT') or '8765'))
         url=f'http://127.0.0.1:{server.server_port}'
         print('契約書作成画面: '+url,flush=True)

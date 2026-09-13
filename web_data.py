@@ -65,11 +65,13 @@ class Workspace:
     def __init__(self,demo=None):
         load_env();self.demo=flag('DEMO_MODE',True) if demo is None else demo
         self.remote=not self.demo or flag('DEMO_WRITE_DB')
-        self.reads=0;self.writes=0;self.lock=threading.RLock();self.cases=[];self.raw={};self.unmatched=[];self.files={}
+        self.reads=0;self.writes=0;self.ai_calls=0;self.lock=threading.RLock();self.cases=[];self.raw={};self.unmatched=[];self.files={}
         self.template=Path(env('CONTRACT_TEMPLATE') or ROOT.parent/'契約書ひな形_名前定義版.xlsm')
         self.output=Path(env('WEB_OUTPUT_DIR') or ROOT/'output/web')
         if self.remote:self.refresh()
         else:self.load_demo()
+        from web_registry import restore
+        if not self.remote:restore(self)
 
     def rpc(self,name,p=None,write=False):
         url,key=env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY')
@@ -159,6 +161,8 @@ class Workspace:
             self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
         for d in docs.values():
             if not d.get('unit_id'):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
+        from web_registry import restore
+        restore(self)
 
     def public(self):
         result=copy.deepcopy(self.cases)
@@ -166,7 +170,7 @@ class Workspace:
             c['review_count']=sum(f['needs_review'] for d in c['documents'] for f in d['fields'])
             c['diff_count']=sum(d['review_status']=='unreviewed' for d in c['diffs'])
         return {'mode':'demo' if self.demo else 'live','db_write_enabled':self.remote,'cases':result,'unmatched':self.unmatched,
-          'usage':{'ai_calls':0,'db_reads':self.reads,'db_writes':self.writes}}
+          'usage':{'ai_calls':self.ai_calls,'db_reads':self.reads,'db_writes':self.writes}}
 
     def case(self,cid):
         case=next((c for c in self.cases if c['id']==cid),None)
@@ -195,6 +199,9 @@ class Workspace:
     def generate(self,cid):
         with self.lock:
             c=self.case(cid);raw=self.raw[cid]
+            if 'uploaded' in raw:
+                from web_registry import generate
+                return generate(self,cid)
             if not raw['registry']:raise StoreError('謄本の中間JSONがないため生成できません。')
             data=copy.deepcopy(raw['registry']);u=raw['unit']
             if not data.get('専有部分'):raise StoreError('区分マンション用の謄本JSONを確認してください。')
