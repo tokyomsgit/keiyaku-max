@@ -1,0 +1,12 @@
+.env
+.env.*
+*.pdf
+*.xlsm
+*.xlsx
+*.xls
+*.zip
+output/
+verification*/
+__pycache__/
+*.pyc
+*_private.json
