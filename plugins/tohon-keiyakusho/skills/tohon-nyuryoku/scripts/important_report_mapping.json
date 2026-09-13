@@ -1,0 +1,247 @@
+{
+  "building_name": {
+    "label": "建物名",
+    "entity_level": "building",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "display_address": {
+    "label": "住居表示",
+    "entity_level": "building",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "total_units": {
+    "label": "総戸数",
+    "entity_level": "building",
+    "data_type": "number",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "completion_month": {
+    "label": "竣工年月",
+    "entity_level": "building",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_company": {
+    "label": "管理会社",
+    "entity_level": "building",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_type": {
+    "label": "管理形態",
+    "entity_level": "building",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_plan_status": {
+    "label": "管理計画認定",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_association": {
+    "label": "管理組合",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "governance_info": {
+    "label": "管理組合の運営",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_rules_effective_date": {
+    "label": "管理規約の施行・改定日",
+    "entity_level": "building",
+    "data_type": "date",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "insurance_info": {
+    "label": "保険",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "common_exclusive_use_rules": {
+    "label": "共用部分の専用使用",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "parking_facility_info": {
+    "label": "駐車場",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "management_rules"
+  },
+  "bike_parking_info": {
+    "label": "駐輪場",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "trunk_room_info": {
+    "label": "トランクルーム",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "communications_info": {
+    "label": "通信設備",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_account_financials": {
+    "label": "管理費会計",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "repair_account_financials": {
+    "label": "修繕積立金会計",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "association_arrears": {
+    "label": "管理組合全体の滞納",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "association_loan_info": {
+    "label": "管理組合の借入",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "fee_change_plans": {
+    "label": "管理費等の変更予定",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "business_minpaku_restrictions": {
+    "label": "事務所・営業・民泊制限",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "management_rules"
+  },
+  "pet_restrictions": {
+    "label": "ペット制限",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "management_rules"
+  },
+  "instrument_restrictions": {
+    "label": "楽器制限",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "management_rules"
+  },
+  "renovation_restrictions": {
+    "label": "リフォーム制限",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "management_rules"
+  },
+  "long_term_repair_plan": {
+    "label": "長期修繕計画",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "repair_history": {
+    "label": "修繕履歴",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "major_repair_plan": {
+    "label": "大規模修繕予定",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "building_document_status": {
+    "label": "建築関係書類",
+    "entity_level": "building",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "unit_name": {
+    "label": "対象住戸の部屋番号",
+    "entity_level": "unit",
+    "data_type": "text",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "management_fee": {
+    "label": "対象住戸の月額管理費（円）",
+    "entity_level": "unit",
+    "data_type": "number",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "repair_reserve_fee": {
+    "label": "対象住戸の月額修繕積立金（円）",
+    "entity_level": "unit",
+    "data_type": "number",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "unit_arrears": {
+    "label": "対象住戸の滞納",
+    "entity_level": "unit",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "other_monthly_fees": {
+    "label": "対象住戸のその他月額費用",
+    "entity_level": "unit",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  },
+  "fee_payment_info": {
+    "label": "管理費等の支払方法",
+    "entity_level": "unit",
+    "data_type": "json",
+    "excel_named_range": null,
+    "primary_source": "important_report"
+  }
+}
