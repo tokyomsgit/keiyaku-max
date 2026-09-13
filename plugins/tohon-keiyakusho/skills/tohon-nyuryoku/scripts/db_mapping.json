@@ -1,0 +1,15 @@
+{
+  "一棟の建物.所在_市区町村町名": {"table":"buildings","column":"registry_location","transform":"location"},
+  "一棟の建物.構造": {"table":"buildings","column":"building_structure"},
+  "一棟の建物.各階床面積": {"table":"buildings","column":"floor_areas","transform":"floors"},
+  "土地": {"table":"buildings","column":"land_lots","transform":"lands"},
+  "専有部分.建物の名称": {"table":"units","column":"unit_name"},
+  "専有部分.種類": {"table":"units","column":"unit_type"},
+  "専有部分.構造": {"table":"units","column":"unit_structure"},
+  "専有部分.階部分": {"table":"units","column":"unit_floor","transform":"floor"},
+  "専有部分.床面積": {"table":"units","column":"registered_area","transform":"number"},
+  "専有部分.建築時期": {"table":"units","column":"built_date","transform":"date"},
+  "所有者.氏名": {"table":"units","column":"current_owner_name"},
+  "所有者.住所": {"table":"units","column":"current_owner_address"},
+  "敷地権": {"table":"units","column":"has_land_right"}
+}
