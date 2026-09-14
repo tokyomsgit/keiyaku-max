@@ -53,6 +53,7 @@ def fixture():
 def build():
     OUT.mkdir(exist_ok=True)
     assets={'index.html':(ROOT/'web/demo-experience.html').read_text(encoding='utf8'),
+            'auth.js':(ROOT/'web/auth.js').read_text(encoding='utf8'),
             'app.js':(ROOT/'web/demo-experience.js').read_text(encoding='utf8')}
     # Publish the same styles as one asset; keep editable source files separate.
     assets['style.css']='\n'.join((ROOT/'web/styles'/f'{name}.css').read_text(encoding='utf8') for name in ('theme','base','layout','components'))
@@ -72,7 +73,7 @@ def build():
             if name.endswith(('.xml','.rels')) and re.search(forbidden,z.read(name).decode('utf8')):raise ValueError('Workbook privacy audit failed')
     for name,content in assets.items():(OUT/name).write_text(content,encoding='utf8')
     (OUT/'demo-contract.xlsx').write_bytes(workbook.read_bytes())
-    print('Public demo build and privacy audit: PASS (4 static files, no API/DB access)')
+    print('Public demo build and privacy audit: PASS (5 static files, Auth only, no DB access)')
 
 
 if __name__=='__main__':build()
