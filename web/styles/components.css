@@ -473,3 +473,9 @@ aside {
 .pill.warn { background: var(--color-warning); color: var(--color-text); }
 .field-error .pill { background: var(--color-danger); color: var(--color-text); }
 .field-approved .pill { background: var(--color-success); color: var(--color-on-primary); }
+
+/* PDF import area only: appearance follows the existing theme. */
+.pdf-drop { min-height: 160px; padding: var(--space-lg); margin-block: var(--space-md); border: 2px dashed var(--color-border); background: var(--color-surface); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-sm); cursor: pointer; text-align: center; }
+.pdf-drop.is-dragging, .pdf-drop:focus-visible { border-color: var(--color-primary); background: var(--color-bg); outline: 2px solid var(--color-primary); }
+.pdf-drop.is-disabled { cursor: not-allowed; }
+.pdf-notices { color: var(--color-text); border-left: 4px solid var(--color-warning); padding-block: var(--space-sm); }
