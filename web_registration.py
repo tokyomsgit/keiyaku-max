@@ -170,3 +170,43 @@ def register(workspace,token,case_mode,resume_case_id=None):
     from web_documents import flush
     warning=flush(workspace,pending['cid'],result['case_id'])
     return {'state':workspace.public(),'case_id':result['case_id'],'registration':result,'warning':warning}
+
+
+def advance(workspace, result):
+    """Automatically register only matches accepted by the existing atomic RPC."""
+    cid=result['case_id']
+    if not workspace.remote or not workspace.case(cid).get('registration_required'):
+        return result
+    try:
+        check=preview(workspace,cid)
+        match=check['match']; cases=match.get('cases') or []
+        if match.get('status') in ('new','existing') and len(cases)<=1:
+            saved=register(workspace,check['token'],'resume' if cases else 'new',
+                           cases[0]['case_id'] if cases else None)
+            return {**result,**saved}
+        result['registration_preview']=check
+        result['warning']=match.get('reason') or '再開する案件を選択してください。'
+    except StoreError as exc:
+        result['warning']=str(exc)
+    return result
+
+
+def choose_candidate(workspace, token, candidate_id):
+    pending=getattr(workspace,'registration_pending',{}).get(token)
+    if not workspace.remote or not pending or pending['match'].get('status')!='ambiguous':
+        raise StoreError('候補を再照合してください。')
+    candidates=pending['match'].get('candidates') or []
+    chosen=next((c for c in candidates if (c.get('unit_id') or c.get('building_id'))==candidate_id),None)
+    if not chosen:raise StoreError('表示された候補から選択してください。')
+    payload=copy.deepcopy(pending['payload'])
+    payload['selected_unit_id' if chosen.get('unit_id') else 'selected_building_id']=candidate_id
+    match=workspace.rpc('rpc/web_registry_match',payload)
+    if match.get('status') not in ('new','existing'):
+        raise StoreError(match.get('reason') or '候補を確定できませんでした。')
+    pending.update(payload=payload,match=match)
+    cases=match.get('cases') or []
+    if len(cases)<=1:
+        return register(workspace,token,'resume' if cases else 'new',cases[0]['case_id'] if cases else None)
+    return {'state':workspace.public(),'case_id':pending['cid'],
+            'registration_preview':{'token':token,'summary':summary(payload),'match':match},
+            'warning':'再開する案件を選択してください。'}

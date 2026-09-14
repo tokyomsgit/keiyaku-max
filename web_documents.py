@@ -59,7 +59,7 @@ def upload(w,cid,files):
         from web_registry import upload as registry_upload
         target=w.case(cid) if cid else None
         result=registry_upload(w,registry);source_id=result['case_id']
-        if target and target.get('purchase_baseline') and w.remote:
+        if target and not target.get('registration_required') and w.remote:
             from web_registration import preview,register
             check=preview(w,source_id)
             if check['match'].get('unit_id')!=target.get('unit_id'):

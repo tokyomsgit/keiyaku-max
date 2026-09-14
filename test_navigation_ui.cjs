@@ -6,7 +6,7 @@ const ui=ctx.ui,c={id:'sample',building_name:'サンプル',unit_name:'101',docu
 ui.setState({mode:'demo',public_demo:false,cases:[c],unmatched:[]});
 const go=hash=>{ctx.location.hash=hash;hashHandlers.forEach(fn=>fn());ui.render();};
 go('');assert.equal((el('#view').innerHTML.match(/class="button/g)||[]).length,3);
-go('#new');assert(el('#panel').innerHTML.includes('ありますか？'));
+go('#new');assert(el('#panel').innerHTML.includes('PDFをここにドラッグ'));assert(!el('#panel').innerHTML.includes('ありますか？'));
 go('#new&source=purchase');assert(el('#panel').innerHTML.includes('PDFをここにドラッグ'));assert(el('#panel').innerHTML.includes('multiple'));assert(/data-action="read-next" disabled/.test(el('#panel').innerHTML));
 go('#new&source=latest');assert(el('#panel').innerHTML.includes('multiple'));assert(!el('#panel').innerHTML.includes('sample.pdf'));
 go('#case=sample&tab=registry');const content=el('#panel').innerHTML;assert(content.indexOf('<h3>物件名')<content.indexOf('<h3>新築日'));assert(content.includes('要確認・差分へ進む'));assert(content.includes('資料へ戻る'));

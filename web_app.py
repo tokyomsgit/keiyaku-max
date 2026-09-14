@@ -66,6 +66,8 @@ def make_server(workspace,port=8765):
                             plan=authorize(workspace,form.get('plan_token'),uploads,form.get('ai_confirmed')=='true')
                             before=workspace.ai_calls
                             result=upload_documents(workspace,form.get('case_id'),uploads)
+                            from web_registration import advance
+                            result=advance(workspace,result)
                             result=summary(workspace,plan,uploads,result,before)
                         elif urlsplit(self.path).path=='/api/upload-report':
                             from web_report import upload as upload_report
@@ -81,6 +83,12 @@ def make_server(workspace,port=8765):
                 elif path=='/api/verify-purchase':
                     from web_purchase import verify_fields
                     with workspace.lock:result=verify_fields(workspace,p['case_id'],p['fields'],p['property_type'])
+                elif path=='/api/select-candidate':
+                    from web_registration import choose_candidate
+                    with workspace.lock:result=choose_candidate(workspace,p['token'],p['candidate_id'])
+                elif path=='/api/auto-register':
+                    from web_registration import advance
+                    with workspace.lock:result=advance(workspace,{'state':workspace.public(),'case_id':p['case_id']})
                 elif path=='/api/registration-preview':
                     from web_registration import preview
                     with workspace.lock:result=preview(workspace,p['case_id'])
