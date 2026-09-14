@@ -1,0 +1,475 @@
+/* components styles. Visual tokens are defined in theme.css. */
+header {
+  background: var(--color-surface);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.brand {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--font-size-15);
+  letter-spacing: var(--size-2);
+  border-radius: var(--radius-5);
+}
+
+.sub {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+aside {
+  background: var(--color-bg);
+  border-right: var(--border-width) solid var(--color-border);
+}
+
+.overline {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  letter-spacing: var(--size-2);
+}
+
+.side-link {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-650);
+  border-radius: var(--radius-md);
+}
+
+.note {
+  font-size: var(--font-size-12);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-1-9);
+}
+
+#usage {
+  font-size: var(--font-size-11);
+  line-height: var(--line-height-2);
+  color: var(--color-text-muted);
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.card {
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-9);
+}
+
+.facts dt {
+  font-size: var(--font-size-12);
+  color: var(--color-text-muted);
+}
+
+.facts dd {
+  font-size: var(--font-size-base);
+  overflow-wrap: anywhere;
+}
+
+.pill {
+  background: var(--color-bg);
+  color: var(--color-success);
+  border-radius: var(--radius-30);
+  font-size: var(--font-size-12);
+}
+
+.pill.warn {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.pill.neutral {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.count {
+  font-size: var(--font-size-28);
+  font-weight: var(--font-weight-650);
+  line-height: var(--line-height-1-8);
+}
+
+.tabs a {
+  text-decoration: none;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+}
+
+.tabs a.active {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+button:hover,.button:hover {
+  filter: brightness(.97);
+}
+
+button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+
+select {
+  font: inherit;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-5);
+  background: var(--color-surface);
+}
+
+.case-row:hover {
+  background: var(--color-bg);
+}
+
+.case-row a {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-650);
+  text-decoration: none;
+}
+
+code {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-11);
+  word-break: break-all;
+}
+
+.evidence {
+  white-space: pre-wrap;
+  font-size: var(--font-size-12);
+  color: var(--color-text-muted);
+}
+
+.diff-values>div {
+  background: var(--color-bg);
+  border-radius: var(--radius-5);
+  overflow-wrap: anywhere;
+}
+
+.diff-values .new {
+  background: var(--color-bg);
+}
+
+#error:not(:empty) {
+  background: var(--color-bg);
+  color: var(--color-danger);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+#notice:not(:empty) {
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-md);
+}
+
+.empty {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.success {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+
+dialog {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow-dialog);
+}
+
+dialog::backdrop {
+  background: var(--color-bg);
+}
+
+input[type=checkbox] {
+  accent-color: var(--color-primary);
+}
+
+.document-tabs button {
+  font-size: var(--font-size-small);
+}
+
+.document-tabs .selected {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+
+.document-tabs button span {
+  font-size: var(--font-size-11);
+  opacity: .7;
+}
+
+.field-head {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-600);
+}
+
+.document-field {
+  background: var(--color-surface);
+  border-bottom: var(--border-width) solid var(--color-border);
+  line-height: var(--line-height-1-7);
+}
+
+.document-field.field-review {
+  background: var(--color-bg);
+}
+
+.document-field.field-error {
+  background: var(--color-bg);
+}
+
+.field-label h3 {
+  font-size: var(--font-size-14);
+}
+
+.field-label code {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-10);
+}
+
+.field-badges .muted {
+  font-size: var(--font-size-11);
+}
+
+.field-value {
+  font-size: var(--font-size-15);
+}
+
+.field-source {
+  font-size: var(--font-size-12);
+  color: var(--color-text-muted);
+}
+
+.source-meta {
+  font-size: var(--font-size-11);
+  color: var(--color-text-muted);
+}
+
+.long-copy {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.clamped {
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.expand-text {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--font-size-12);
+}
+
+.value-table {
+  font-size: var(--font-size-12);
+  background: var(--color-surface);
+}
+
+.value-table th,.value-table td {
+  border-bottom: var(--border-width) solid var(--color-border);
+  font-size: var(--font-size-12);
+}
+
+.value-table th {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.value-table .long-copy {
+  font-size: var(--font-size-12);
+}
+
+.object-values dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+@media(max-width:700px) {
+.field-source {
+  border-top: var(--border-width) dashed var(--color-border);
+}
+
+.field-source::before {
+  content: '根拠情報';
+  font-size: var(--font-size-11);
+  color: var(--color-text-muted);
+}
+}
+
+.value-table[aria-label="各階床面積"] td {
+  white-space: nowrap;
+}
+
+.upload-warning {
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.source-files {
+  font-size: var(--font-size-12);
+  overflow-wrap: anywhere;
+}
+
+.source-files summary {
+  cursor: pointer;
+  color: var(--color-primary);
+}
+
+.side-link {
+  background: transparent;
+}
+
+.side-link:hover {
+  background: var(--color-bg);
+}
+
+.note {
+  font-size: var(--font-size-small);
+}
+
+.steps {
+  background: var(--color-bg);
+}
+
+.steps a {
+  text-decoration: none;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-bottom: var(--size-3) solid transparent;
+  text-align: center;
+}
+
+.steps a.active {
+  background: var(--color-surface);
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-700);
+}
+
+.card {
+  border-radius: var(--radius-md);
+}
+
+.next-task {
+  background: var(--color-bg);
+  border-left: var(--size-3) solid var(--color-primary);
+}
+
+.document-tabs .selected {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.document-tabs a {
+  font-size: var(--font-size-base);
+}
+
+.field-label h3,.field-value {
+  font-size: var(--font-size-base);
+}
+
+.field-state {
+  font-size: var(--font-size-14);
+}
+
+.field-state small {
+  color: var(--color-text-muted);
+}
+
+.field-approved {
+  background: var(--color-bg);
+}
+
+.pill {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.field-approved .pill {
+  background: var(--color-bg);
+  color: var(--color-success);
+}
+
+.field-error .pill {
+  background: var(--color-bg);
+  color: var(--color-danger);
+}
+
+.evidence-toggle summary {
+  cursor: pointer;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.evidence-body {
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border);
+  font-size: var(--font-size-14);
+  overflow-wrap: anywhere;
+}
+
+.review-section>summary {
+  font-weight: var(--font-weight-650);
+  cursor: pointer;
+}
+
+.step-actions {
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.value-table th,.value-table td,.value-table .long-copy {
+  font-size: var(--font-size-14);
+}
+
+.toolbar input[type=search] {
+  font: inherit;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-5);
+}
+
+.field-state .pill {
+  font-size: var(--font-size-small);
+}
+
+@media(max-width:900px) {
+aside {
+  border-right: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+}
+
+@media(max-width:700px) {
+.steps a {
+  font-size: var(--font-size-14);
+}
+
+.field-state {
+  border-top: var(--border-width) dashed var(--color-border);
+}
+
+.step-actions .button,.step-actions button {
+  font-size: var(--font-size-14);
+}
+}
+
+/* State colors and button hierarchy use the public theme tokens. */
+.primary:hover { background: var(--color-primary-hover); }
+.pill.warn { background: var(--color-warning); color: var(--color-text); }
+.field-error .pill { background: var(--color-danger); color: var(--color-text); }
+.field-approved .pill { background: var(--color-success); color: var(--color-on-primary); }

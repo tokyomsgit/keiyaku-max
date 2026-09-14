@@ -50,3 +50,12 @@ Excelの「数式」→「名前の管理」で名前の参照先を直します
 3. 社員に「プラグイン画面で更新を押して」と伝える
 
 `fill_tohon.py` は原則として触りません。
+
+## 見た目を変更する場合
+
+- 色・文字サイズ・余白・角丸・枠線：`web/styles/theme.css`
+- 画面幅・配置・レスポンシブ：`web/styles/layout.css`
+- ボタン・表・状態表示・根拠・アップロード：`web/styles/components.css`
+- リセット・本文・見出し・表の基本：`web/styles/base.css`
+
+`web/style.css`は読込入口です。HTML/JavaScriptへ見た目を直書きせず、クラスとthemeの変数を使用します。公開デモのビルドでは同じ4ファイルを1つのCSSにまとめます。

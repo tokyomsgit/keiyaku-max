@@ -72,6 +72,9 @@ class Workspace:
         else:self.load_demo()
         from web_registry import restore
         if not self.remote:restore(self)
+        if not self.remote:
+            from web_report import restore as restore_reports
+            restore_reports(self)
 
     def rpc(self,name,p=None,write=False):
         url,key=env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY')
@@ -103,7 +106,7 @@ class Workspace:
         fields=[field_view(x['field_code'],{**x,**evidence_item(evidence,x['field_code'])}) for x in converted['values']]
         report_fields=[field_view(k,v) for k,v in h['fields'].items()]
         docs=[{'id':'demo-registry','version_id':'demo-registry-v1','type':'registry','filename':Path(registry).name,'version':1,'date':None,'fields':fields},
-              {'id':'demo-report','version_id':'demo-report-v1','type':'important_report','filename':h.get('source',{}).get('original_filename','重調解析済みJSON'),'version':1,'date':None,'fields':report_fields}]
+              {'id':'demo-report','version_id':'demo-report-v1','type':'important_report','filename':h.get('source',{}).get('original_filename','重調解析済みJSON'),'file_hash':h.get('source',{}).get('file_hash'),'version':1,'date':None,'fields':report_fields}]
         diffs=[]
         for code,new in [('management_fee',(hv('management_fee') or 0)+1500),('current_owner_name','デモ用変更候補（実在しない法人）')]:
             old=unit.get(code)

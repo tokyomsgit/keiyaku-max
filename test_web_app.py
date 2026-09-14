@@ -66,6 +66,8 @@ class WebTests(unittest.TestCase):
             c.request(method,path,body,headers or {});r=c.getresponse();result=(r.status,r.read(),dict(r.getheaders()));c.close();return result
         try:
             status,body,_=request('GET','/api/state');self.assertEqual(status,200);csrf=json.loads(body)['csrf']
+            for sheet in ('theme','base','layout','components'):
+                self.assertEqual(request('GET','/styles/'+sheet+'.css')[0],200)
             for path in ('/.env','/web_data.py','/../.env','/download/unknown'):
                 self.assertEqual(request('GET',path)[0],404)
             self.assertEqual(request('GET','/api/state',headers={'Host':'evil.example'})[0],403)

@@ -9,5 +9,5 @@ assert(html.includes('<summary>根拠</summary>'));assert(!html.includes('<detai
 const panel={innerHTML:''};ui.renderExcel({...c,generation_blocked:true},panel);assert(panel.innerHTML.includes('生成不可'));assert(/data-action="generate" disabled/.test(panel.innerHTML));
 ui.renderExcel(c,panel);assert(!/data-action="generate" disabled/.test(panel.innerHTML));
 ui.setState({mode:'demo',public_demo:true,cases:[c],unmatched:[]});ui.renderExcel(c,panel);assert(/data-action="generate" disabled/.test(panel.innerHTML));
-ui.renderDetail(c,panel);assert(panel.innerHTML.includes(' multiple hidden disabled'));assert(panel.innerHTML.includes('重調PDFの読取はこの画面では未対応'));
+ui.renderDetail(c,panel);assert(panel.innerHTML.includes(' multiple hidden disabled'));assert(panel.innerHTML.includes('重調はこの案件に追加'));
 assert.equal(JSON.stringify(c),before);console.log('PASS: collapsed evidence, hidden technical fields, missing status, generation guard, public restrictions, immutable input');

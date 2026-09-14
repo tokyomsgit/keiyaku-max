@@ -35,6 +35,8 @@ def make_server(workspace,port=8765):
                 if not item or not item.is_file():return self.send(404,{'error':'ファイルがありません。再生成してください。'})
                 return self.send(200,item.read_bytes(),'application/vnd.ms-excel.sheet.macroEnabled.12',item.name)
             files={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
+            for sheet in ('theme','base','layout','components'):
+                files['/styles/'+sheet+'.css']=('styles/'+sheet+'.css','text/css; charset=utf-8')
             if path not in files:return self.send(404,{'error':'ページがありません。'})
             name,kind=files[path];return self.send(200,(ROOT/'web'/name).read_bytes(),kind)
         def do_POST(self):
@@ -43,7 +45,7 @@ def make_server(workspace,port=8765):
                 return self.send(403,{'error':'画面を再読込してください。'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
-                if urlsplit(self.path).path=='/api/upload-registry':
+                if urlsplit(self.path).path in ('/api/upload-registry','/api/upload-report'):
                     if not 0<size<=40*1024*1024:raise StoreError('PDF合計サイズは40MB以内にしてください。')
                     from email.parser import BytesParser
                     from email.policy import default
@@ -52,7 +54,13 @@ def make_server(workspace,port=8765):
                     if not content_type.startswith('multipart/form-data'):raise ValueError()
                     message=BytesParser(policy=default).parsebytes(('Content-Type: '+content_type+'\r\nMIME-Version: 1.0\r\n\r\n').encode()+self.rfile.read(size))
                     files=[(p.get_filename(),p.get_payload(decode=True)) for p in message.iter_parts() if p.get_filename()]
-                    with workspace.lock:result=upload(workspace,files)
+                    with workspace.lock:
+                        if urlsplit(self.path).path=='/api/upload-report':
+                            from web_report import upload as upload_report
+                            cid=next((part.get_content() for part in message.iter_parts() if part.get_param('name',header='content-disposition')=='case_id' and not part.get_filename()),None)
+                            if not isinstance(cid,str) or len(cid)>200:raise ValueError()
+                            result=upload_report(workspace,cid,files)
+                        else:result=upload(workspace,files)
                     return self.send(200,result)
                 if not 0<size<8192:raise ValueError()
                 p=json.loads(self.rfile.read(size));path=urlsplit(self.path).path

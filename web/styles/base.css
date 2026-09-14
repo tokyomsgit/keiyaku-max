@@ -1,0 +1,84 @@
+/* base styles. Visual tokens are defined in theme.css. */
+:root {
+  font-family: var(--font-family);
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  font-size: var(--font-size-15);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-650);
+}
+
+h2 {
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-650);
+}
+
+h3 {
+  font-size: var(--font-size-base);
+}
+
+button,.button {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+table {
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th {
+  font-size: var(--font-size-12);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-550);
+  background: var(--color-bg);
+}
+
+td,th {
+  border-bottom: var(--border-width) solid var(--color-border);
+  vertical-align: top;
+}
+
+td {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-1-7);
+  overflow-wrap: anywhere;
+}
+
+ul {
+  line-height: var(--line-height-1-9);
+}
+
+@media(max-width:600px) {
+h1 {
+  font-size: var(--font-size-23);
+}
+}
+
+:root {
+  font-size: var(--font-size-base);
+}
+
+h1 {
+  font-size: var(--font-size-title);
+}
+
+td,th {
+  font-size: var(--font-size-15);
+}
+
+summary {
+  line-height: var(--line-height-1-7);
+}
