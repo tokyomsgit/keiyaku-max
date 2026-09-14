@@ -66,6 +66,12 @@ def make_server(workspace,port=8765):
                 p=json.loads(self.rfile.read(size));path=urlsplit(self.path).path
                 if path=='/api/decision':result=workspace.decide(p['case_id'],p['diff_id'],p['action'])
                 elif path=='/api/generate':result=workspace.generate(p['case_id'])
+                elif path=='/api/registration-preview':
+                    from web_registration import preview
+                    with workspace.lock:result=preview(workspace,p['case_id'])
+                elif path=='/api/register-case':
+                    from web_registration import register
+                    with workspace.lock:result=register(workspace,p['token'],p['case_mode'],p.get('resume_case_id'))
                 elif path=='/api/refresh':
                     with workspace.lock:workspace.refresh();result=workspace.public()
                 else:return self.send(404,{'error':'操作がありません。'})

@@ -1,4 +1,3 @@
-begin;
 create or replace function public.web_workspace_snapshot(p jsonb default '{}')
 returns jsonb language sql security invoker set search_path='' as $fn$
 select jsonb_build_object(
@@ -61,4 +60,3 @@ begin
 end $fn$;
 revoke all on function public.web_workspace_snapshot(jsonb),public.web_review_diff(jsonb) from public,anon,authenticated;
 grant execute on function public.web_workspace_snapshot(jsonb),public.web_review_diff(jsonb) to service_role;
-commit;

@@ -137,7 +137,8 @@ class Workspace:
                 for e in s['values']:
                     if e['document_version_id']!=vid:continue
                     meta=(v.get('important_raw_json') or {}).get('fields',{}).get(e['field_code'],{})
-                    values.append(field_view(e['field_code'],{**meta,**e}))
+                    provenance=e.get('registry_provenance') or {}
+                    values.append(field_view(e['field_code'],{**meta,**e,'needs_review':bool(meta.get('needs_review') or provenance.get('needs_review'))}))
                 documents.append({'id':d['document_id'],'version_id':vid,'type':d['document_type'],'filename':v.get('original_filename'),
                   'version':v['version_no'],'date':v.get('as_of_date') or v.get('uploaded_at'),'fields':values})
             diffs=[]
@@ -145,7 +146,8 @@ class Workspace:
                 if docs[x['document_id']].get('unit_id')!=unit['unit_id']:continue
                 e=next((e for e in s['values'] if e['document_version_id']==x['new_version_id'] and e['field_code']==x['field_code']),{})
                 meta=(versions.get(x['new_version_id'],{}).get('important_raw_json') or {}).get('fields',{}).get(x['field_code'],{})
-                trusted=not field_view(x['field_code'],{**meta,**e})['needs_review']
+                provenance=e.get('registry_provenance') or {}
+                trusted=not field_view(x['field_code'],{**meta,**e,'needs_review':bool(meta.get('needs_review') or provenance.get('needs_review'))})['needs_review']
                 diffs.append({**x,'id':x['diff_id'],'code':x['field_code'],'label':LABELS.get(x['field_code'],x['field_code']),
                   'can_adopt':trusted,'source':versions.get(x['new_version_id'],{}).get('original_filename')})
             c={'id':case['case_id'],'unit_id':unit['unit_id'],'building_name':b.get('building_name'),'unit_name':unit.get('unit_name'),
@@ -153,7 +155,7 @@ class Workspace:
               'status':case.get('case_status') or '確認中','updated_at':case.get('updated_at') or unit.get('updated_at'),'documents':documents,'diffs':diffs}
             self.cases.append(c)
             imports=[i for i in s['imports'] if docs[versions[i['document_version_id']]['document_id']].get('unit_id')==unit['unit_id']]
-            imports.sort(key=lambda i:versions[i['document_version_id']]['version_no'])
+            imports.sort(key=lambda i:(i.get('created_at') or versions[i['document_version_id']].get('uploaded_at') or '',i['content_hash']))
             # Start from the original registry, then overlay explicitly adopted master values.
             registry=copy.deepcopy(imports[0]['raw_json']) if imports else None
             report_fields={}
@@ -161,7 +163,13 @@ class Workspace:
                 if doc['type']=='important_report':
                     for f in doc['fields']:
                         if f.get('approved'):report_fields[f['code']]=f
-            self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
+            if registry and registry.get('format')=='normalized_registry_v1':
+                from web_registry import case_from
+                normalized=registry['integrated']
+                safety=case_from(normalized,c['id'])
+                c.update(property_type=safety['property_type'],generation_blocked=safety['generation_blocked'])
+                self.raw[c['id']]={'uploaded':normalized,'registered':True,'unit':unit,'building':b,'report_fields':report_fields}
+            else:self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
         for d in docs.values():
             if not d.get('unit_id'):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
         from web_registry import restore

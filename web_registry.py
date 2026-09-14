@@ -71,8 +71,10 @@ def case_from(data,cid):
 def restore(workspace):
     for path in (workspace.output/'imports').glob('*/integrated.json'):
         try:
+            if workspace.remote and (path.parent/'registration.json').is_file():continue
             data=json.loads(path.read_text(encoding='utf8'));cid=path.parent.name
-            workspace.cases.append(case_from(data,cid));workspace.raw[cid]={'uploaded':data}
+            case=case_from(data,cid);case['registration_required']=bool(workspace.remote)
+            workspace.cases.append(case);workspace.raw[cid]={'uploaded':data}
         except (OSError,ValueError,KeyError):continue
 
 
@@ -90,7 +92,7 @@ def upload(workspace,files):
         records.append([name,content,digest,data])
     from extract_registry import extract_registry
     from verify_all import integrate
-    docs={};items=[]
+    docs={};items=[];manifest=[]
     for i,(name,content,digest,data) in enumerate(records):
         folder=workspace.output/'registry_cache'/digest;folder.mkdir(parents=True,exist_ok=True)
         pdf=folder/'source.pdf';pdf.write_bytes(content)
@@ -101,13 +103,24 @@ def upload(workspace,files):
             workspace.ai_calls+=1
             data=extract_registry(pdf,folder)
         docs[str(i)]=copy.deepcopy(data);docs[str(i)].setdefault('metadata',{})
+        def tag(node):
+            if isinstance(node,dict):
+                for source in node.get('sources',[]):source.update(source_pdf=name,file_hash=digest)
+                for key,child in node.items():
+                    if key not in ('sources','metadata'):tag(child)
+            elif isinstance(node,list):
+                for child in node:tag(child)
+        tag(docs[str(i)])
+        manifest.append({'file_hash':digest,'original_filename':name,'storage_path':str(pdf.resolve())})
         items.append({'id':str(i),'path':name,'sha256':digest})
     data=integrate(items,docs);data['upload_filenames']=[r[0] for r in records]
+    data['registration_documents']=manifest
     cid='upload-'+hashlib.sha256('|'.join(sorted(seen)).encode()).hexdigest()[:24]
     folder=workspace.output/'imports'/cid;folder.mkdir(parents=True,exist_ok=True)
     (folder/'integrated.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf8')
     workspace.cases=[c for c in workspace.cases if c['id']!=cid]
-    workspace.cases.append(case_from(data,cid));workspace.raw[cid]={'uploaded':data}
+    case=case_from(data,cid);case['registration_required']=bool(workspace.remote)
+    workspace.cases.append(case);workspace.raw[cid]={'uploaded':data}
     return {'state':workspace.public(),'case_id':cid,'reused':sum(r[3] is not None for r in records)}
 
 
@@ -119,12 +132,35 @@ def generate(workspace,cid):
     import re
     import uuid
     c=workspace.case(cid)
+    if c.get('registration_required'):raise StoreError('登録前の確認を行い、「この案件で登録」を押してください。')
     if c.get('generation_blocked'):raise StoreError('対象外の物件、または資料間の要確認事項があるため自動生成を停止しました。')
     token=uuid.uuid4().hex;folder=workspace.output/token;folder.mkdir(parents=True)
     output=folder/'契約書_謄本入力済.xlsm'
     # Reuse the existing plan and package writer, preserving formulas in the
     # named official template even where the older template had plain inputs.
-    writes,review=plan(workspace.raw[cid]['uploaded'])
+    raw=workspace.raw[cid];data=copy.deepcopy(raw['uploaded'])
+    if raw.get('registered'):
+        for code,path in {'current_owner_name':'owner.name','current_owner_address':'owner.address','registered_area':'unit.registered_area',
+            'house_number':'unit.house_number','unit_name':'unit.name','unit_type':'unit.type','unit_structure':'unit.structure',
+            'unit_floor':'unit.floor','built_date':'unit.built_date','has_land_right':'land_right.exists','land_right_type':'land_right.type'}.items():
+            section,key=path.split('.');v=raw['unit'].get(code)
+            if code=='built_date' and v:
+                from web_registration import iso_date
+                if iso_date(data.get(section,{}).get(key,{}).get('value'))==v:continue
+                import datetime as dt
+                actual=dt.date.fromisoformat(v)
+                for era,start in [('令和',(2019,5,1)),('平成',(1989,1,8)),('昭和',(1926,12,25)),('大正',(1912,7,30)),('明治',(1868,9,8))]:
+                    if actual>=dt.date(*start):
+                        v=f'{era}{actual.year-start[0]+1}年{actual.month}月{actual.day}日';break
+            # Use master values, not unapproved values from the incoming PDF.
+            if v != data.get(section,{}).get(key,{}).get('value'):
+                data.setdefault(section,{})[key]={'value':v,'sources':[],'needs_review':v is None}
+        n,d=raw['unit'].get('land_right_numerator'),raw['unit'].get('land_right_denominator')
+        if n is not None and d is not None:
+            share={'value':f'{d}分の{n}','sources':[],'needs_review':False}
+            data.setdefault('land_right',{})['share']=copy.deepcopy(share)
+            for land in data.get('lands',[]):land['right_share']=copy.deepcopy(share)
+    writes,review=plan(data)
     with zipfile.ZipFile(workspace.template) as src:
         parts={n:src.read(n) for n in src.namelist()};sheets=workbook_sheets(src);part=sheets['基本入力']
         xml=parts[part].decode('utf8');cells={c.get('r'):c for c in ET.fromstring(xml).findall('.//s:sheetData/s:row/s:c',NS)}
@@ -140,8 +176,15 @@ def generate(workspace,cid):
             for item in src.infolist():out.writestr(item,parts[item.filename])
     checks=verify(workspace.template,candidate,applied)
     candidate.rename(output)
+    report_count=0
+    if raw.get('registered'):
+        from important_report_store import write_named_excel
+        report_output=folder/'with_report.xlsm'
+        report=write_named_excel(output,report_output,raw.get('report_fields',{}))
+        if report['output']:
+            report_output.replace(output);report_count=len(report['written'])
     (folder/'verification.json').write_text(json.dumps(checks,ensure_ascii=False,default=str),encoding='utf8')
     workspace.files[token]=output
     return {'download':'/download/'+token,'filename':output.name,'registry_written':len(applied),
-      'report_written':0,'warnings':review['review_items'],'unsupported':[],
+      'report_written':report_count,'warnings':review['review_items'],'unsupported':[],
       'message':'生成・再読込確認が完了しました。'}
