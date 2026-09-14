@@ -56,6 +56,18 @@ class RegistrationTests(unittest.TestCase):
         for v in ('令和元年4月30日','平成31年5月1日','平成12年2月30日'):
             self.assertIsNone(iso_date(v))
 
+    def test_leasehold_terms_are_saved_as_extracted_values(self):
+        data=fixture();data['property_type']['value']='leasehold_condominium'
+        source={'page':1,'text':'地上権設定','file_hash':'a'*64,'source_pdf':'fixture.pdf'}
+        data['leasehold']={'area':{'value':873.97,'needs_review':False,'sources':[source]},
+          'law_type':{'value':'旧法','needs_review':False,'sources':[source]},
+          'ground_rent_unit_per_3_3sqm':{'value':400,'needs_review':True,'sources':[source]}}
+        payload=payload_from(data)
+        fields={x['field_code']:x for x in payload['fields']}
+        self.assertEqual(fields['leasehold_area']['value'],873.97)
+        self.assertEqual(fields['leasehold_law_type']['value'],'旧法')
+        self.assertTrue(fields['leasehold_ground_rent_unit']['needs_review'])
+
     def workspace(self,root,remote=True):
         return SimpleNamespace(remote=remote,raw={'upload':{'uploaded':fixture()}},case=Mock(),
             rpc=Mock(return_value={'status':'new','cases':[]}),output=Path(root),cases=[{'id':'upload'}],

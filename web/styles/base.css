@@ -12,12 +12,14 @@
 
 h1 {
   font-size: var(--font-size-title);
-  font-weight: var(--font-weight-650);
+  font-weight: var(--font-weight-700);
+  color: var(--color-heading);
 }
 
 h2 {
   font-size: var(--font-size-section);
-  font-weight: var(--font-weight-650);
+  font-weight: var(--font-weight-700);
+  color: var(--color-heading);
 }
 
 h3 {
@@ -32,6 +34,8 @@ button,.button {
   font: inherit;
   cursor: pointer;
   text-decoration: none;
+  min-height: 42px;
+  font-weight: var(--font-weight-650);
 }
 
 table {
@@ -42,8 +46,8 @@ table {
 th {
   font-size: var(--font-size-12);
   color: var(--color-text-muted);
-  font-weight: var(--font-weight-550);
-  background: var(--color-bg);
+  font-weight: var(--font-weight-700);
+  background: #E2E6E9;
 }
 
 td,th {

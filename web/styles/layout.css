@@ -4,11 +4,11 @@ body {
 }
 
 header {
-  height: var(--size-76);
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-xl);
+  padding: 0 var(--space-lg);
 }
 
 header>div {
@@ -24,7 +24,7 @@ header>div {
 .shell {
   display: grid;
   grid-template-columns: var(--size-220) 1fr;
-  min-height: calc(100vh - var(--size-76));
+  min-height: calc(100vh - 64px);
 }
 
 aside {
@@ -45,9 +45,9 @@ aside {
 }
 
 main {
-  max-width: var(--size-1550);
+  max-width: 1380px;
   width: 100%;
-  padding: var(--space-36) var(--space-42);
+  padding: var(--space-28) var(--space-xl) var(--space-45);
 }
 
 h1 {
@@ -66,8 +66,8 @@ h2 {
 }
 
 .card {
-  padding: var(--space-25);
-  margin-bottom: var(--space-22);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-20);
 }
 
 .grid {
@@ -139,7 +139,7 @@ table {
 }
 
 td,th {
-  padding: var(--space-15) var(--space-13);
+  padding: var(--space-12) var(--space-13);
 }
 
 .table-scroll {
@@ -460,12 +460,12 @@ input[type=file] {
 }
 
 main {
-  max-width: none;
-  padding: var(--space-28) var(--space-36);
+  max-width: 1380px;
+  padding: var(--space-28) var(--space-xl);
 }
 
 .shell {
-  grid-template-columns: var(--size-170) minmax(0,1fr);
+  grid-template-columns: 190px minmax(0,1fr);
 }
 
 aside {
@@ -486,8 +486,8 @@ aside {
   z-index: 5;
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: var(--space-1);
-  padding: var(--space-12) 0 var(--space-18);
+  gap: 0;
+  padding: 0;
   margin: var(--space-10) 0 var(--space-22);
 }
 
@@ -583,8 +583,8 @@ main {
 
 @media(max-width:700px) {
 .steps {
-  grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: var(--space-xs);
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 0;
 }
 
 .steps a {

@@ -39,7 +39,11 @@ def case_from(data,cid):
       'floor_areas':'building.floor_areas','house_number':'unit.house_number','unit_name':'unit.name','unit_type':'unit.type',
       'unit_structure':'unit.structure','unit_floor':'unit.floor','registered_area':'unit.registered_area','built_date':'unit.built_date',
       'current_owner_name':'owner.name','current_owner_address':'owner.address','land_lots':'lands','has_land_right':'land_right.exists',
-      'land_right_type':'land_right.type','land_right_share':'land_right.share','mortgages':'mortgages'}
+      'land_right_type':'land_right.type','land_right_share':'land_right.share','mortgages':'mortgages',
+      'leasehold_area':'leasehold.area','leasehold_ground_rent_monthly':'leasehold.ground_rent_monthly',
+      'leasehold_ground_rent_unit':'leasehold.ground_rent_unit_per_3_3sqm','leasehold_law_type':'leasehold.law_type',
+      'leasehold_period_start':'leasehold.period_start','leasehold_period_end':'leasehold.period_end',
+      'leasehold_period_years':'leasehold.period_years','leasehold_assignment_consent':'leasehold.assignment_consent_required'}
     values=[]
     for code,path in mapping.items():
         v=data
@@ -56,10 +60,13 @@ def case_from(data,cid):
         f=copy.deepcopy(v) if isinstance(v,dict) and 'value' in v else {'value':copy.deepcopy(v) if isinstance(v,list) else None}
         f.update(source_text='\n'.join(dict.fromkeys(x.get('text','') for x in sources)),page_no=sources[0].get('page') if sources else None)
         values.append(field_view(code,f))
-    LABELS.update(mortgages='抵当権',land_right_share='敷地権の割合')
+    LABELS.update(mortgages='抵当権',land_right_share='敷地権の割合',leasehold_area='借地対象面積',
+      leasehold_ground_rent_monthly='地代（月額）',leasehold_ground_rent_unit='地代（3.3㎡当たり月額）',
+      leasehold_law_type='借地権の法区分',leasehold_period_start='借地期間開始',leasehold_period_end='借地期間終了',
+      leasehold_period_years='借地期間',leasehold_assignment_consent='譲渡承諾の要否')
     for f in values:f['label']=LABELS.get(f['code'],f['code'])
     kind=get(data,'property_type');blocked=kind not in ('condominium_land_right','condominium_no_land_right','leasehold_condominium')
-    warnings=list(data.get('group_review',[]))
+    warnings=list(data.get('group_review',[]))+list(data.get('leasehold_warnings',[]))
     if blocked:warnings.insert(0,'戸建ては区分マンション用ひな形の対象外です。' if kind=='detached_house' else '物件タイプを確定できないため、Excel生成を停止しました。')
     return {'id':cid,'unit_id':None,'building_name':get(data,'building.name') or '取込資料（物件名未取得）',
       'unit_name':get(data,'unit.name'),'address':get(data,'building.location'),'owner':get(data,'owner.name'),
@@ -117,6 +124,26 @@ def upload(workspace,files):
         manifest.append({'file_hash':digest,'original_filename':name,'storage_path':str(pdf.resolve())})
         items.append({'id':str(i),'path':name,'sha256':digest})
     data=integrate(items,docs);data['upload_filenames']=[r[0] for r in records]
+    # Text-layer land registries can supply explicit leasehold terms locally.
+    # This never derives a unit's total rent from the per-3.3㎡ registry rate.
+    from leasehold_reader import read_land_registry
+    for name,content,digest,_ in records:
+        if not ('土地' in name or 'land' in name.lower()):continue
+        pdf=workspace.output/'registry_cache'/digest/'source.pdf'
+        try:local=read_land_registry(pdf)
+        except (OSError,ValueError):continue
+        lease=local.get('leasehold')
+        if not lease:continue
+        section=data.setdefault('leasehold',{})
+        for key,value in lease.items():
+            if key in section or value is None:continue
+            section[key]={'value':value,'sources':[{'page':1,'text':'土地謄本の地上権・賃借権設定欄','source_pdf':name,'file_hash':digest}],
+                          'needs_review':key in ('ground_rent_unit_per_3_3sqm','assignment_consent_required')}
+        data.setdefault('leasehold_warnings',[]).extend(x for x in local.get('warnings',[]) if x not in data.get('leasehold_warnings',[]))
+        current=get(data,'property_type');right=get(data,'land_right.type')
+        if current in (None,'unknown') and right in ('地上権','賃借権'):
+            source={'page':1,'text':'土地謄本の地上権・賃借権設定欄','source_pdf':name,'file_hash':digest}
+            data['property_type']={'value':'leasehold_condominium','sources':[source],'needs_review':False}
     data['registration_documents']=manifest
     cid='upload-'+hashlib.sha256('|'.join(sorted(seen)).encode()).hexdigest()[:24]
     folder=workspace.output/'imports'/cid;folder.mkdir(parents=True,exist_ok=True)
@@ -128,15 +155,15 @@ def upload(workspace,files):
 
 
 def generate(workspace,cid):
+    c=workspace.case(cid)
+    if c.get('registration_required'):raise StoreError('登録前の確認を行い、「この案件で登録」を押してください。')
+    if c.get('generation_blocked'):raise StoreError('対象外の物件、または資料間の要確認事項があるため自動生成を停止しました。')
     reader_root()
     from practical_contract import plan,workbook_sheets,patch_input,recache,shared_strings,verify,NS
     import xml.etree.ElementTree as ET
     import zipfile
     import re
     import uuid
-    c=workspace.case(cid)
-    if c.get('registration_required'):raise StoreError('登録前の確認を行い、「この案件で登録」を押してください。')
-    if c.get('generation_blocked'):raise StoreError('対象外の物件、または資料間の要確認事項があるため自動生成を停止しました。')
     token=uuid.uuid4().hex;folder=workspace.output/token;folder.mkdir(parents=True)
     output=folder/'契約書_謄本入力済.xlsm'
     # Reuse the existing plan and package writer, preserving formulas in the

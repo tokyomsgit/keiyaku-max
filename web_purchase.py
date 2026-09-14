@@ -20,7 +20,7 @@ def integrated(data, fields=None):
           'sources':[{'page':item.get('page_no'),'text':item.get('source_text') or '',
              'source_pdf':src.get('original_filename'),'file_hash':src.get('file_hash')}] if item.get('page_no') and item.get('source_text') else []}
     result={'property_type':{'value':data['property_type'],'sources':[]},'lands':[],'mortgages':[],
-       'building':{},'unit':{},'owner':{},'land_right':{},'group_review':[]}
+       'building':{},'unit':{},'owner':{},'land_right':{},'leasehold':{},'group_review':[]}
     for code,path in PATHS.items():
         if '.' not in path:continue
         section,key=path.split('.');result[section][key]=node(fields.get(code,{}))

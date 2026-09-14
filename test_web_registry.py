@@ -34,5 +34,16 @@ class UploadTests(unittest.TestCase):
         c=case_from({'property_type':{'value':'condominium_land_right'}},'test')
         self.assertFalse(c['generation_blocked'])
 
+    def test_leasehold_terms_are_visible_without_exposing_codes(self):
+        node=lambda value:{'value':value,'sources':[{'page':1,'text':'土地謄本'}],'needs_review':False}
+        data={'property_type':node('leasehold_condominium'),'leasehold':{
+          'area':node(873.97),'law_type':node('旧法'),'period_years':node(60),
+          'ground_rent_unit_per_3_3sqm':node(400)}}
+        case=case_from(data,'lease')
+        self.assertFalse(case['generation_blocked'])
+        values={f['code']:f['value'] for f in case['documents'][0]['fields']}
+        self.assertEqual(values['leasehold_area'],873.97)
+        self.assertEqual(values['leasehold_ground_rent_unit'],400)
+
 
 if __name__=='__main__':unittest.main()

@@ -16,7 +16,11 @@ PATHS = {
  'unit_type':'unit.type','unit_structure':'unit.structure','unit_floor':'unit.floor',
  'registered_area':'unit.registered_area','built_date':'unit.built_date','current_owner_name':'owner.name',
  'current_owner_address':'owner.address','has_land_right':'land_right.exists','land_right_type':'land_right.type',
- 'land_lots':'lands','active_mortgages':'mortgages'}
+ 'land_lots':'lands','active_mortgages':'mortgages','leasehold_area':'leasehold.area',
+ 'leasehold_ground_rent_monthly':'leasehold.ground_rent_monthly',
+ 'leasehold_ground_rent_unit':'leasehold.ground_rent_unit_per_3_3sqm','leasehold_law_type':'leasehold.law_type',
+ 'leasehold_period_start':'leasehold.period_start','leasehold_period_end':'leasehold.period_end',
+ 'leasehold_period_years':'leasehold.period_years','leasehold_assignment_consent':'leasehold.assignment_consent_required'}
 BUILDING={'building_name','registry_location','building_structure','floor_areas','land_lots'}
 
 
