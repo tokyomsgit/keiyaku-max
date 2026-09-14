@@ -122,7 +122,8 @@ class Workspace:
         for code,new in [('management_fee',(hv('management_fee') or 0)+1500),('current_owner_name','デモ用変更候補（実在しない法人）')]:
             old=unit.get(code)
             diffs.append({'id':'demo-'+code,'code':code,'label':LABELS[code],'old_value':old,'new_value':new,
-              'review_status':'unreviewed','demo':True,'can_adopt':True,'source':'操作確認用の差分（原本の記載ではありません）'})
+              'review_status':'unreviewed','demo':True,'can_adopt':True,'old_date':'2024-04-01','new_date':'2026-01-31',
+              'recommended_source':'new','source':'操作確認用の差分（原本の記載ではありません）'})
         c={'id':'demo-case','unit_id':'demo-unit','building_name':hv('building_name'),'unit_name':hv('unit_name'),
           'address':hv('display_address') or building.get('registry_location'),'owner':unit.get('current_owner_name'),
           'area':unit.get('registered_area'),'status':'デモ確認中','updated_at':None,'documents':docs,'diffs':diffs}
@@ -160,12 +161,18 @@ class Workspace:
                 if case.get('purchase_values') is None and (x.get('affected_field') or '').startswith('purchase:'):continue
                 if document.get('unit_id')!=unit['unit_id'] and not (document['document_type']=='management_rules' and document.get('building_id')==unit['building_id'] and document.get('unit_id') is None):continue
                 e=next((e for e in s['values'] if e['document_version_id']==x['new_version_id'] and e['field_code']==x['field_code']),{})
+                olde=next((e for e in s['values'] if e['document_version_id']==x.get('old_version_id') and e['field_code']==x['field_code']),{})
                 version=versions.get(x['new_version_id'],{})
+                oldversion=versions.get(x.get('old_version_id'),{})
                 meta=(version.get('important_raw_json') or version.get('management_rules_raw_json') or {}).get('fields',{}).get(x['field_code'],{})
                 provenance=e.get('registry_provenance') or {}
                 trusted=not field_view(x['field_code'],{**meta,**e,'needs_review':bool(meta.get('needs_review') or provenance.get('needs_review'))})['needs_review']
+                olddate=olde.get('value_as_of_date') or oldversion.get('as_of_date') or oldversion.get('uploaded_at')
+                newdate=e.get('value_as_of_date') or version.get('as_of_date') or version.get('uploaded_at')
+                recommended='new' if trusted and olddate and newdate and str(newdate)>str(olddate) else None
                 diffs.append({**x,'id':x['diff_id'],'code':x['field_code'],'label':LABELS.get(x['field_code'],x['field_code']),
-                  'can_adopt':trusted,'document_type':document['document_type'],'source':versions.get(x['new_version_id'],{}).get('original_filename')})
+                  'can_adopt':trusted,'old_date':olddate,'new_date':newdate,'recommended_source':recommended,
+                  'document_type':document['document_type'],'source':version.get('original_filename')})
             c={'id':case['case_id'],'unit_id':unit['unit_id'],'building_id':unit['building_id'],'building_name':b.get('building_name'),'unit_name':unit.get('unit_name'),
               'address':b.get('display_address') or b.get('registry_location'),'owner':unit.get('current_owner_name'),'area':unit.get('registered_area'),
               'status':case.get('case_status') or '確認中','updated_at':case.get('updated_at') or unit.get('updated_at'),'documents':documents,'diffs':diffs}

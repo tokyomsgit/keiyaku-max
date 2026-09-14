@@ -178,11 +178,29 @@ code {
 .review-choices button span,.review-choices button small { font-weight: var(--font-weight-650); }
 .review-choices button strong { font-size: var(--font-size-23); overflow-wrap: anywhere; }
 .review-focus details { margin-top: var(--space-md); }
+.review-table-wrap { overflow-x: auto; }
+.review-table { width: 100%; border-collapse: collapse; }
+.review-table th,.review-table td { padding: var(--space-12); border-bottom: var(--border-width) solid var(--color-border); vertical-align: top; }
+.review-table thead th { text-align: left; background: var(--color-bg); }
+.review-table tbody th { width: 26%; text-align: left; }
+.review-table tbody td { width: 37%; }
+.review-table details { margin-top: var(--space-sm); font-weight: 400; }
+.radio-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--space-xs) var(--space-sm); align-items: start; cursor: pointer; padding: var(--space-10); border: var(--border-width) solid transparent; }
+.radio-choice:has(input:checked) { border-color: var(--color-primary); background: var(--color-bg); }
+.radio-choice input { grid-row: 1 / span 3; margin-top: var(--space-xs); }
+.radio-choice span,.radio-choice strong,.radio-choice small { grid-column: 2; }
+.radio-choice strong { font-size: var(--font-size-section); overflow-wrap: anywhere; }
+.radio-choice small { color: var(--color-text-muted); }
+.radio-choice.recommended span { font-weight: var(--font-weight-700); }
 
 @media(max-width:700px) {
   .review-heading { align-items: center; }
   .review-choices { grid-template-columns: 1fr; }
   .review-choices button { min-height: 112px; }
+  .review-table thead { display: none; }
+  .review-table,.review-table tbody,.review-table tr,.review-table th,.review-table td { display: block; width: 100%; }
+  .review-table tr { padding: var(--space-md) 0; border-bottom: var(--border-width) solid var(--color-border); }
+  .review-table th,.review-table td { border: 0; padding: var(--space-xs) 0; }
 }
 
 #error:not(:empty) {
