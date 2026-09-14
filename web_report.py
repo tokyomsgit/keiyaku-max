@@ -85,6 +85,8 @@ def upload(workspace, cid, files):
         pdf.write_bytes(content)
         if data is None:
             from important_report_reader import read_report
+            from web_ai_cost import permit
+            permit(workspace,'report',pdf)
             workspace.ai_calls += 1
             data = read_existing(read_report,pdf, workspace.output/'report_cache')
         else:

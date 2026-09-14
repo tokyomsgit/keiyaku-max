@@ -45,7 +45,7 @@ def make_server(workspace,port=8765):
                 return self.send(403,{'error':'画面を再読込してください。'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
-                if urlsplit(self.path).path in ('/api/upload-registry','/api/upload-report','/api/upload-documents'):
+                if urlsplit(self.path).path in ('/api/upload-registry','/api/upload-report','/api/upload-documents','/api/prepare-documents'):
                     if not 0<size<=40*1024*1024:raise StoreError('PDF合計サイズは40MB以内にしてください。')
                     from email.parser import BytesParser
                     from email.policy import default
@@ -55,12 +55,18 @@ def make_server(workspace,port=8765):
                     message=BytesParser(policy=default).parsebytes(('Content-Type: '+content_type+'\r\nMIME-Version: 1.0\r\n\r\n').encode()+self.rfile.read(size))
                     files=[(p.get_filename(),p.get_payload(decode=True)) for p in message.iter_parts() if p.get_filename()]
                     with workspace.lock:
-                        if urlsplit(self.path).path=='/api/upload-documents':
+                        if urlsplit(self.path).path in ('/api/upload-documents','/api/prepare-documents'):
                             from web_documents import upload as upload_documents
                             form={part.get_param('name',header='content-disposition'):part.get_content() for part in message.iter_parts() if not part.get_filename()}
                             kinds=json.loads(form.get('kinds','[]'))
                             if len(kinds)!=len(files):raise ValueError()
-                            result=upload_documents(workspace,form.get('case_id'),[(k,n,v) for k,(n,v) in zip(kinds,files)])
+                            from web_ai_cost import prepare,authorize,summary
+                            uploads=[(k,n,v) for k,(n,v) in zip(kinds,files)]
+                            if urlsplit(self.path).path=='/api/prepare-documents':return self.send(200,prepare(workspace,uploads,form.get('case_id')))
+                            plan=authorize(workspace,form.get('plan_token'),uploads,form.get('ai_confirmed')=='true')
+                            before=workspace.ai_calls
+                            result=upload_documents(workspace,form.get('case_id'),uploads)
+                            result=summary(workspace,plan,uploads,result,before)
                         elif urlsplit(self.path).path=='/api/upload-report':
                             from web_report import upload as upload_report
                             cid=next((part.get_content() for part in message.iter_parts() if part.get_param('name',header='content-disposition')=='case_id' and not part.get_filename()),None)

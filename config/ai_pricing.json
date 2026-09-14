@@ -1,0 +1,14 @@
+{
+  "source": "https://developers.openai.com/api/docs/models/gpt-4.1",
+  "verified_on": "2026-09-14",
+  "usd_to_jpy": null,
+  "models": {
+    "gpt-4.1": {
+      "input_per_1m_tokens_usd": 2.0,
+      "output_per_1m_tokens_usd": 8.0,
+      "image_page_estimate_usd": null,
+      "output_tokens_estimate": 16000,
+      "prompt_tokens_estimate": 16000
+    }
+  }
+}

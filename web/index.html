@@ -3,4 +3,5 @@
 <div class="shell"><aside><p class="overline">WORKSPACE</p><nav aria-label="メインメニュー"><a href="#" class="side-link">案件</a><a href="#settings" class="side-link">設定</a><a href="#help" class="side-link">ヘルプ</a></nav><p class="note">読取済みの資料を確認し、差分を採用してからExcelを生成します。</p><div id="usage"></div></aside>
 <main><div id="notice" role="status"></div><div id="error" role="alert"></div><div id="view"><p>読み込み中…</p></div></main></div>
 <dialog id="confirm"><h2>この差分を採用しますか？</h2><div id="confirm-text"></div><p>採用した値だけ確定値に反映します。</p><div class="actions"><button id="cancel">戻る</button><button id="accept" class="primary">採用する</button></div></dialog>
+<dialog id="ai-confirm"><h2>AI解析前の確認</h2><p id="ai-confirm-text"></p><div class="actions"><button id="ai-cancel">キャンセル</button><button id="ai-start" class="primary">解析を開始</button></div></dialog>
 <script src="/app.js"></script></body></html>

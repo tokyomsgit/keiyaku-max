@@ -121,7 +121,16 @@ def upload(w,cid,files):
             for code,item in incoming.get('fields',{}).items():
                 if item.get('verified_at','')>merged.get(code,{}).get('verified_at',''):merged[code]=item
             target.write_text(json.dumps({**incoming,**current,'fields':merged},ensure_ascii=False),encoding='utf8')
-    def count():w.ai_calls+=1
+    normalized=folder/'extracted_normalized.json'
+    if normalized.exists() and not (folder/'extracted_raw.json').exists():
+        data=json.loads(normalized.read_text(encoding='utf8'))
+        if data.get('source',{}).get('file_hash')==digest and data.get('is_purchase_explanation') is True:
+            data['source'].update(original_filename=name.replace('\\','/').rsplit('/',1)[-1],storage_path=str(pdf.resolve()))
+            return _stage_cached(w,data)
+    def count():
+        from web_ai_cost import permit
+        permit(w,'purchase',pdf)
+        w.ai_calls+=1
     data=read_existing(read_purchase,pdf,w.output/'purchase_cache',on_api=count,allow_api=not w.demo)
     data['source'].update(original_filename=name.replace('\\','/').rsplit('/',1)[-1],storage_path=str(pdf.resolve()))
     cid=stage(w,data)
@@ -202,3 +211,8 @@ def generate(w,cid):
         result['warnings'].insert(0,'購入時重説を初期資料にしています。現在採用中の値を出力しました。最新資料と照合してください。')
         return result
     finally:w.raw[cid]=original
+
+
+def _stage_cached(w,data):
+    cid=stage(w,data)
+    return {"state":w.public(),"case_id":cid,"reused":1}

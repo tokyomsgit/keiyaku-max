@@ -35,7 +35,10 @@ def prepare(workspace,filename,content):
     reused=data is not None
     if data is None:
         from management_rules_reader import read_rules
-        def count():workspace.ai_calls+=1
+        def count():
+            from web_ai_cost import permit
+            permit(workspace,'rules',pdf)
+            workspace.ai_calls+=1
         data=read_existing(read_rules,pdf,workspace.output/'rules_cache',on_api=count)
     data=copy.deepcopy(data);data['source'].update(original_filename=filename,storage_path=str(pdf.resolve()))
     (folder/'extracted_normalized.json').write_text(json.dumps(data,ensure_ascii=False),encoding='utf8')

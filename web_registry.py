@@ -101,6 +101,8 @@ def upload(workspace,files):
             key=env('OPENAI_API_KEY')
             if not key:raise StoreError('API設定不足：管理者がOPENAI_API_KEYを設定してください。')
             os.environ['OPENAI_API_KEY']=key
+            from web_ai_cost import permit
+            permit(workspace,'registry',pdf)
             workspace.ai_calls+=1
             data=read_existing(extract_registry,pdf,folder)
         docs[str(i)]=copy.deepcopy(data);docs[str(i)].setdefault('metadata',{})
