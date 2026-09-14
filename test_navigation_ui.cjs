@@ -1,0 +1,17 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const elements=new Map(),handlers={};const el=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',addEventListener(type,fn){handlers[type]=fn;}});return elements.get(id)};
+const hashHandlers=[];const ctx={document:{querySelector:el},window:{addEventListener:(type,fn)=>hashHandlers.push(fn)},fetch:()=>new Promise(()=>{}),URLSearchParams,location:{hash:''},console};
+vm.runInNewContext(fs.readFileSync(__dirname+'/web/app.js','utf8')+`\nglobalThis.ui={render,renderDocuments,renderDetail,nextWork,setState:s=>state=s,results};`,ctx);
+const ui=ctx.ui,c={id:'sample',building_name:'サンプル',unit_name:'101',documents:[{type:'registry',version_id:'v1',fields:[{code:'built_date',label:'新築日',value:'2020-01-01'},{code:'house_number',label:'家屋番号',value:'1番101',excel_supported:true},{code:'building_name',label:'物件名',value:'サンプル',excel_supported:true}]}],diffs:[],diff_count:0};
+ui.setState({mode:'demo',public_demo:false,cases:[c],unmatched:[]});
+const go=hash=>{ctx.location.hash=hash;hashHandlers.forEach(fn=>fn());ui.render();};
+go('');assert.equal((el('#view').innerHTML.match(/class="button/g)||[]).length,3);
+go('#new');assert(el('#panel').innerHTML.includes('ありますか？'));
+go('#new&source=purchase');assert(el('#panel').innerHTML.includes('購入時重説PDFを選択'));assert(!el('#panel').innerHTML.includes('multiple'));assert(/data-action="read-next" disabled/.test(el('#panel').innerHTML));
+handlers.change({target:{id:'registry-pdfs',files:[{name:'sample.pdf'}]}});assert(el('#panel').innerHTML.includes('value="purchase" selected'));assert(!/data-action="read-next" disabled/.test(el('#panel').innerHTML));
+go('#new&source=latest');assert(el('#panel').innerHTML.includes('multiple'));assert(!el('#panel').innerHTML.includes('sample.pdf'));
+go('#case=sample&tab=registry');const content=el('#panel').innerHTML;assert(content.indexOf('<h3>物件名')<content.indexOf('<h3>新築日'));assert(content.includes('要確認・差分へ進む'));assert(content.includes('資料へ戻る'));
+go('#case=sample&tab=review');assert(el('#panel').innerHTML.includes('Excel生成へ進む'));go('#case=sample&tab=excel');assert(el('#panel').innerHTML.includes('契約書Excelを生成'));
+assert.equal(ui.nextWork({...c,registration_required:true})[1],'detail');assert.equal(ui.nextWork({...c,diff_count:2})[1],'review');assert.equal(ui.nextWork(c)[1],'registry');ui.results.set(c.id,{download:'/api/download/sample',filename:'sample.xlsm'});assert.equal(ui.nextWork(c)[1],'excel');ui.render();assert(el('#panel').innerHTML.includes('Excelをダウンロード'));
+go('#list=done');assert(el('#view').innerHTML.includes('次の作業'));assert(el('#view').innerHTML.includes('#case=sample&tab=excel'));go('#list=working');assert(!el('#view').innerHTML.includes('class="case-row"'));
+console.log('PASS: start, both branches, selection reset, priority order, step links, resume guards, download, completed filter');
