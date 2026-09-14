@@ -45,21 +45,34 @@ def flush(w,source_id,cid):
 
 
 def upload(w,cid,files):
-    if not 1<=len(files)<=12 or any(k not in ('registry','report','rules') for k,_,_ in files):raise StoreError('各PDFの資料種類を選択してください。')
+    if not 1<=len(files)<=12 or any(k not in ('registry','report','rules','purchase') for k,_,_ in files):raise StoreError('各PDFの資料種類を選択してください。')
     if len({hashlib.sha256(v).hexdigest() for _,_,v in files})!=len(files):raise StoreError('同じPDFが複数選択されています。1件にしてください。')
     for _,name,content in files:
         if not name.lower().endswith('.pdf') or not content.startswith(b'%PDF-'):raise StoreError('PDFを選択してください。')
     registry=[(n,v) for k,n,v in files if k=='registry']
-    if registry:
+    purchases=[(n,v) for k,n,v in files if k=='purchase']
+    if purchases:
+        if registry or cid:raise StoreError('購入時重説は新規案件の最初に取り込んでください。謄本は登録後に追加できます。')
+        from web_purchase import upload as purchase_upload
+        result=purchase_upload(w,None,purchases);cid=result['case_id']
+    elif registry:
         from web_registry import upload as registry_upload
-        result=registry_upload(w,registry);cid=result['case_id']
+        target=w.case(cid) if cid else None
+        result=registry_upload(w,registry);source_id=result['case_id']
+        if target and target.get('purchase_baseline') and w.remote:
+            from web_registration import preview,register
+            check=preview(w,source_id)
+            if check['match'].get('unit_id')!=target.get('unit_id'):
+                raise StoreError('謄本と選択案件の住戸が一致しません。自動紐付けを停止しました。')
+            result=register(w,check['token'],'resume',target['id']);cid=target['id']
+        else:cid=source_id
     elif cid:w.case(cid)
-    else:raise StoreError('新規案件には建物・土地謄本を選択してください。')
+    else:raise StoreError('新規案件には購入時重説または建物・土地謄本を選択してください。')
     path=queue_path(w,cid);record=json.loads(path.read_text(encoding='utf8')) if path.exists() else {'source_id':cid,'case_id':None,'files':[]}
     # A fresh upload of the same registry set must be confirmed again before attaching documents.
     if registry:record['case_id']=None
     for kind,name,content in files:
-        if kind=='registry':continue
+        if kind in ('registry','purchase'):continue
         name=name.replace('\\','/').rsplit('/',1)[-1];digest=hashlib.sha256(content).hexdigest()
         folder=w.output/('rules_cache' if kind=='rules' else 'report_cache')/digest;folder.mkdir(parents=True,exist_ok=True)
         pdf=folder/'source.pdf';pdf.write_bytes(content)

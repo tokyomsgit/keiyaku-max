@@ -63,7 +63,9 @@ def upload(workspace,cid,files):
             attach(workspace,cid,data)
             folder=workspace.output/'rules_imports'/hashlib.sha256(cid.encode()).hexdigest();folder.mkdir(parents=True,exist_ok=True)
             (folder/(data['source']['file_hash']+'.json')).write_text(json.dumps({'case_id':cid,'data':data},ensure_ascii=False),encoding='utf8')
-    if workspace.remote:workspace.refresh()
+    if workspace.remote:
+        if case.get('purchase_baseline'):workspace.rpc('rpc/web_sync_purchase_diffs',{'case_id':cid},write=True)
+        workspace.refresh()
     return {'state':workspace.public(),'case_id':cid,'reused':reused}
 
 

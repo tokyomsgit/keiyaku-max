@@ -68,10 +68,13 @@ def make_server(workspace,port=8765):
                             result=upload_report(workspace,cid,files)
                         else:result=upload(workspace,files)
                     return self.send(200,result)
-                if not 0<size<8192:raise ValueError()
+                if not 0<size<(65536 if urlsplit(self.path).path=='/api/verify-purchase' else 8192):raise ValueError()
                 p=json.loads(self.rfile.read(size));path=urlsplit(self.path).path
                 if path=='/api/decision':result=workspace.decide(p['case_id'],p['diff_id'],p['action'])
                 elif path=='/api/generate':result=workspace.generate(p['case_id'])
+                elif path=='/api/verify-purchase':
+                    from web_purchase import verify_fields
+                    with workspace.lock:result=verify_fields(workspace,p['case_id'],p['fields'],p['property_type'])
                 elif path=='/api/registration-preview':
                     from web_registration import preview
                     with workspace.lock:result=preview(workspace,p['case_id'])

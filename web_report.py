@@ -108,5 +108,6 @@ def upload(workspace, cid, files):
             (target/(digest+'.json')).write_text(json.dumps({'case_id':cid,'data':data},ensure_ascii=False),encoding='utf8')
             attach(workspace, cid, data)
     if workspace.remote:
+        if case.get('purchase_baseline'):workspace.rpc('rpc/web_sync_purchase_diffs',{'case_id':cid},write=True)
         workspace.refresh()
     return {'state':workspace.public(), 'case_id':cid, 'reused':reused}

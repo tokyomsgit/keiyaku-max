@@ -5,10 +5,10 @@ select jsonb_build_object(
  'cases',coalesce((select jsonb_agg(to_jsonb(c)) from public.cases c),'[]'),
  'units',coalesce((select jsonb_agg(to_jsonb(u)) from public.units u),'[]'),
  'buildings',coalesce((select jsonb_agg(to_jsonb(b)) from public.buildings b),'[]'),
- 'documents',coalesce((select jsonb_agg(to_jsonb(d)) from public.documents d where document_type in ('registry','important_report','management_rules')),'[]'),
- 'versions',coalesce((select jsonb_agg(to_jsonb(v)-'storage_path') from public.document_versions v join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules')),'[]'),
- 'values',coalesce((select jsonb_agg(to_jsonb(e)) from public.extracted_values e join public.document_versions v using(document_version_id) join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules')),'[]'),
- 'diffs',coalesce((select jsonb_agg(to_jsonb(f)) from public.value_diffs f join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules')),'[]'),
+ 'documents',coalesce((select jsonb_agg(to_jsonb(d)) from public.documents d where document_type in ('registry','important_report','management_rules','purchase_important_explanation')),'[]'),
+ 'versions',coalesce((select jsonb_agg(to_jsonb(v)-'storage_path') from public.document_versions v join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules','purchase_important_explanation')),'[]'),
+ 'values',coalesce((select jsonb_agg(to_jsonb(e)) from public.extracted_values e join public.document_versions v using(document_version_id) join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules','purchase_important_explanation')),'[]'),
+ 'diffs',coalesce((select jsonb_agg(to_jsonb(f)) from public.value_diffs f join public.documents d using(document_id) where d.document_type in ('registry','important_report','management_rules','purchase_important_explanation')),'[]'),
  'imports',coalesce((select jsonb_agg(jsonb_build_object('document_version_id',r.document_version_id,'raw_json',r.raw_json,'created_at',r.created_at,'content_hash',r.content_hash)) from public.registry_imports r),'[]'));
 $fn$;
 

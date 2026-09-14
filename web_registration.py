@@ -127,9 +127,12 @@ def payload_from(data):
 
 
 def preview(workspace,cid):
-    workspace.case(cid);data=workspace.raw[cid].get('uploaded')
+    workspace.case(cid);data=workspace.raw[cid].get('uploaded') or workspace.raw[cid].get('purchase')
     if not data:raise StoreError('登録対象の取込案件を選択してください。')
-    payload=payload_from(data)
+    if data.get('is_purchase_explanation'):
+        from web_purchase import payload as purchase_payload
+        payload=purchase_payload(data)
+    else:payload=payload_from(data)
     if not workspace.remote:
         return {'demo':True,'summary':summary(payload),'match':{'status':'demo','candidates':[],'cases':[]},
             'message':'デモモードではDB照合・登録を行いません。'}

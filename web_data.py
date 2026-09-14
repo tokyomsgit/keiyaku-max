@@ -80,6 +80,8 @@ class Workspace:
             restore_reports(self)
             from web_rules import restore as restore_rules
             restore_rules(self)
+            from web_purchase import restore as restore_purchase
+            restore_purchase(self)
 
     def rpc(self,name,p=None,write=False):
         url,key=env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY')
@@ -150,6 +152,8 @@ class Workspace:
             diffs=[]
             for x in s['diffs']:
                 document=docs[x['document_id']]
+                if case.get('purchase_values') is not None and x.get('affected_field')!='purchase:'+case['case_id']:continue
+                if case.get('purchase_values') is None and (x.get('affected_field') or '').startswith('purchase:'):continue
                 if document.get('unit_id')!=unit['unit_id'] and not (document['document_type']=='management_rules' and document.get('building_id')==unit['building_id'] and document.get('unit_id') is None):continue
                 e=next((e for e in s['values'] if e['document_version_id']==x['new_version_id'] and e['field_code']==x['field_code']),{})
                 version=versions.get(x['new_version_id'],{})
@@ -178,10 +182,14 @@ class Workspace:
                 c.update(property_type=safety['property_type'],generation_blocked=safety['generation_blocked'])
                 self.raw[c['id']]={'uploaded':normalized,'registered':True,'unit':unit,'building':b,'report_fields':report_fields}
             else:self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
+            from web_purchase import apply_snapshot
+            apply_snapshot(self,c,case,s)
         for d in docs.values():
             if not d.get('unit_id') and not (d['document_type']=='management_rules' and d.get('building_id')):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
         from web_registry import restore
         restore(self)
+        from web_purchase import restore as restore_purchase
+        restore_purchase(self)
 
     def public(self):
         result=copy.deepcopy(self.cases)
@@ -207,7 +215,8 @@ class Workspace:
             if diff['review_status'] in ('applied','ignored'):raise StoreError('処理済みの差分です。')
             if action=='adopt' and not diff.get('can_adopt'):raise StoreError('根拠が不明なため採用できません。原本確認が必要です。')
             if self.remote:
-                if diff.get('document_type')=='management_rules':self.rpc('rpc/review_management_rules_diff',{'diff_id':did,'case_id':cid,'action':action},write=True)
+                if (diff.get('affected_field') or '').startswith('purchase:'):self.rpc('rpc/web_review_purchase_diff',{'diff_id':did,'case_id':cid,'action':action},write=True)
+                elif diff.get('document_type')=='management_rules':self.rpc('rpc/review_management_rules_diff',{'diff_id':did,'case_id':cid,'action':action},write=True)
                 else:self.rpc('rpc/web_review_diff',{'diff_id':did,'unit_id':c['unit_id'],'action':action},write=True)
                 self.refresh()
             else:
@@ -225,6 +234,9 @@ class Workspace:
             from web_documents import pending_names
             if self.remote and pending_names(self,cid):raise StoreError('未保存の追加資料があります。物件・資料で保存を完了してください。')
             c=self.case(cid);raw=self.raw[cid]
+            if 'purchase' in raw:
+                from web_purchase import generate
+                return generate(self,cid)
             if 'uploaded' in raw:
                 from web_registry import generate
                 return generate(self,cid)
