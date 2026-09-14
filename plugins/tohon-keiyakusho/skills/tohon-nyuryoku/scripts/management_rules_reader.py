@@ -6,7 +6,7 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 from important_report_reader import pdf_pages, content_for_pdf
-from management_rules_schema import API_SCHEMA, MAPPING, normalize
+from management_rules_schema import API_SCHEMA, MAPPING, normalize, apply_review
 from supabase_store import env, NoRedirect, canonical, StoreError
 
 PROMPT='''管理規約・使用細則から、指定された契約書確認用14項目だけを抽出する。
@@ -83,6 +83,8 @@ def read_rules(pdf_path,cache_dir,on_api=None):
             else:raise StoreError('管理規約のAPI読取を完了できませんでした。管理者が接続設定・利用上限を確認してください。') from None
         except (OSError,ValueError):raise StoreError('管理規約を読み取れませんでした。接続と資料を確認してください。') from None
     result=normalize(raw,pages)
+    review=folder/'reviewed_fields.json'
+    if review.exists():result=apply_review(result,json.loads(review.read_text(encoding='utf8')),digest,pages)
     result['source']={'file_hash':digest,'original_filename':path.name,'storage_path':str(path),'page_count':len(pages),
         'text_pages':sum(p['mode']=='text' for p in pages),'cache_reused':reused}
     (folder/'extracted_normalized.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf8')

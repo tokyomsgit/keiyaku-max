@@ -4,18 +4,25 @@ import hashlib
 import json
 from pathlib import Path
 from web_data import ROOT, StoreError, field_view, env
-from management_rules_schema import MAPPING, normalize
+from management_rules_schema import MAPPING, normalize, apply_review
 from important_report_schema import compact
 
 
 def cached(digest,output):
     roots=[output/'rules_cache',ROOT.parent/'verification_rules/cache']
     if env('MANAGEMENT_RULES_CACHE_DIR'):roots.insert(0,Path(env('MANAGEMENT_RULES_CACHE_DIR')))
+    review=None
+    for root in roots:
+        path=root/digest/'reviewed_fields.json'
+        if path.is_file():
+            candidate=json.loads(path.read_text(encoding='utf8'))
+            if review is None or max((x.get('verified_at','') for x in candidate.get('fields',{}).values()),default='')>max((x.get('verified_at','') for x in review.get('fields',{}).values()),default=''):review=candidate
     for root in roots:
         path=root/digest/'extracted_normalized.json'
         if path.is_file():
             data=json.loads(path.read_text(encoding='utf8'))
-            if data.get('source',{}).get('file_hash')==digest and data.get('is_management_rules') is True:return normalize(data)
+            if data.get('source',{}).get('file_hash')==digest and data.get('is_management_rules') is True:
+                return apply_review(data,review,digest) if review else normalize(data)
     return None
 
 

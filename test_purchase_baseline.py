@@ -57,14 +57,15 @@ class PurchaseTests(unittest.TestCase):
                 self.assertTrue(read_purchase(p,root,allow_api=False)['source']['cache_reused']);net.assert_not_called()
 
     def test_excel_uses_only_selected_values_not_newest_document(self):
-        case={'id':'case'};old={'purchase':sample()};w=SimpleNamespace(raw={'case':old})
-        with patch('web_registry.generate',return_value={'warnings':[]}) as writer:
+        case={'id':'case'};old={'purchase':sample()};w=SimpleNamespace(raw={'case':old},files={'token':Path('test.xlsm')})
+        with patch('web_registry.generate') as writer,patch('purchase_excel.append_purchase_fields',return_value={'written':[]}) as extra:
             def inspect(work,cid):
                 self.assertEqual(work.raw[cid]['unit']['registered_area'],40.49)
                 self.assertNotIn('current_owner_name',work.raw[cid]['unit'])
-                return {'warnings':[]}
+                return {'warnings':[],'download':'/download/token','report_written':0}
             old['purchase']['fields']['current_owner_name']['needs_review']=True
             writer.side_effect=inspect;generate(w,'case')
+            self.assertNotIn('current_owner_name',extra.call_args.args[1])
         self.assertIs(w.raw['case'],old)
 
     def test_snapshot_selects_explicit_evidence_ids(self):

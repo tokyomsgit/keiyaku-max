@@ -17,6 +17,7 @@ from supabase_store import env,canonical,NoRedirect,StoreError,convert
 from important_report_schema import MAPPING
 from important_report_store import write_named_excel
 from management_rules_schema import MAPPING as RULES_MAPPING
+from purchase_excel import MAPPING as PURCHASE_MAPPING
 
 
 def load_env():
@@ -59,9 +60,12 @@ def field_view(code,item):
     item['needs_review']=bool(item.get('needs_review') or item.get('value') is None or not item.get('source_text')
       or not item.get('page_no') or confidence is None or confidence<.85)
     item['excel_supported']=code not in MAPPING or bool(MAPPING[code]['excel_named_range'])
+    if code in RULES_MAPPING:item['excel_supported']=False
+    if code in PURCHASE_MAPPING:item['excel_supported']=bool(PURCHASE_MAPPING[code]['excel_named_range'])
     return item
 
 LABELS.update({k:v['label'] for k,v in RULES_MAPPING.items() if k not in LABELS})
+LABELS.update({k:v['label'] for k,v in PURCHASE_MAPPING.items()})
 
 
 class Workspace:

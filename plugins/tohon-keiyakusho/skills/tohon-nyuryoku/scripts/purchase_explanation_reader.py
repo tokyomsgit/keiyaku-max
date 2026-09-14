@@ -20,8 +20,9 @@ REGISTRY = {
  'land_right_type':'敷地権種類','land_right_numerator':'持分分子','land_right_denominator':'持分分母',
  'current_owner_name':'資料当時の登記名義人','current_owner_address':'資料当時の登記名義人住所',
  'active_mortgages':'資料当時の抵当権'}
-LABELS={**{k:v['label'] for k,v in REPORT.items()},**{k:v['label'] for k,v in RULES.items()},**REGISTRY}
-NUMBER={'registered_area','land_right_numerator','land_right_denominator','total_units','management_fee','repair_reserve_fee'}
+PURCHASE=json.loads(Path(__file__).with_name('purchase_mapping.json').read_text(encoding='utf8'))
+LABELS={**{k:v['label'] for k,v in REPORT.items()},**{k:v['label'] for k,v in RULES.items()},**REGISTRY,**{k:v['label'] for k,v in PURCHASE.items()}}
+NUMBER={'registered_area','land_right_numerator','land_right_denominator','total_units','management_fee','repair_reserve_fee','wall_center_area','sale_price','earnest_money'}
 KINDS=('condominium_land_right','condominium_no_land_right','leasehold_condominium','detached_house','unknown')
 API_SCHEMA=obj({'is_purchase_explanation':{'type':'boolean'},'property_type':{'type':'string','enum':list(KINDS)},
  'fields':{'type':'array','items':obj({'field_code':{'type':'string','enum':list(LABELS)},**copy.deepcopy(ITEM['properties'])})}})
@@ -72,7 +73,7 @@ def normalize(raw,pages):
                             if not re.fullmatch(r'\d+(?:\.\d+)?',token):raise ValueError()
                             land[key]=float(token) if '.' in token else int(token)
                         if land.get('numerator') is not None and land.get('denominator') is not None and not 0<land['numerator']<=land['denominator']:reasons.append('土地持分を確認してください')
-            if code=='built_date' and v is not None:
+            if code in ('built_date','handover_date') and v is not None:
                 from datetime import date
                 v=date.fromisoformat(v).isoformat()
         except (ValueError,TypeError):v=None;reasons.append('値の形式を確認してください')

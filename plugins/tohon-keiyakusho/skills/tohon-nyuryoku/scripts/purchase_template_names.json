@@ -1,0 +1,8 @@
+{
+  "購入時_sale_price":{"reference":"'基本入力'!$AA$70","label_cell":"V70","label":"物件価格"},
+  "購入時_earnest_money":{"reference":"'基本入力'!$AA$72","label_cell":"V72","label":"手付金"},
+  "購入時_handover_date_era":{"reference":"'基本入力'!$O$119","label_cell":"B119","label":"引渡・決済日"},
+  "購入時_handover_date_year":{"reference":"'基本入力'!$R$119","label_cell":"B119","label":"引渡・決済日"},
+  "購入時_handover_date_month":{"reference":"'基本入力'!$V$119","label_cell":"B119","label":"引渡・決済日"},
+  "購入時_handover_date_day":{"reference":"'基本入力'!$Z$119","label_cell":"B119","label":"引渡・決済日"}
+}

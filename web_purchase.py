@@ -111,7 +111,15 @@ def upload(w,cid,files):
         raw=root/digest/'extracted_raw.json'
         if raw.exists() and not (folder/'extracted_raw.json').exists():(folder/'extracted_raw.json').write_bytes(raw.read_bytes())
         review=root/digest/'reviewed_fields.json'
-        if review.exists() and not (folder/'reviewed_fields.json').exists():(folder/'reviewed_fields.json').write_bytes(review.read_bytes())
+        if review.exists():
+            target=folder/'reviewed_fields.json'
+            incoming=json.loads(review.read_text(encoding='utf8'))
+            current=json.loads(target.read_text(encoding='utf8')) if target.exists() else {}
+            if incoming.get('file_hash')!=digest:raise StoreError('原本確認データが別のPDFです。')
+            merged=dict(current.get('fields',{}))
+            for code,item in incoming.get('fields',{}).items():
+                if item.get('verified_at','')>merged.get(code,{}).get('verified_at',''):merged[code]=item
+            target.write_text(json.dumps({**incoming,**current,'fields':merged},ensure_ascii=False),encoding='utf8')
     def count():w.ai_calls+=1
     data=read_purchase(pdf,w.output/'purchase_cache',on_api=count,allow_api=not w.demo)
     data['source'].update(original_filename=name.replace('\\','/').rsplit('/',1)[-1],storage_path=str(pdf.resolve()))
@@ -143,7 +151,7 @@ def verify_fields(w,cid,entries,property_type):
         asof=entry.get('value_as_of_date') or None
         try:
             if asof:dt.date.fromisoformat(asof)
-            if code=='built_date' and v:dt.date.fromisoformat(v)
+            if code in ('built_date','handover_date') and v:dt.date.fromisoformat(v)
         except (TypeError,ValueError):raise StoreError('日付は西暦の年月日で入力してください。') from None
         old=data['fields'].get(code,{})
         changed[code]={**old,'value':v,'page_no':page,'source_text':quote,'confidence':1,
@@ -186,6 +194,10 @@ def generate(w,cid):
        'report_fields':{k:dict(v,approved=True) for k,v in fields.items()}}
     try:
         result=existing_generate(w,cid)
+        from purchase_excel import append_purchase_fields
+        extra=append_purchase_fields(w.files[result['download'].split('/')[-1]],fields)
+        result['purchase_written']=len(extra['written'])
+        result['report_written']+=len(extra['written'])
         result['warnings'].insert(0,'購入時重説を初期資料にしています。現在採用中の値を出力しました。最新資料と照合してください。')
         return result
     finally:w.raw[cid]=original

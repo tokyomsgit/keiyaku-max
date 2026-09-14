@@ -35,6 +35,20 @@ def normalize(raw,pages=None):
             elif compact(item['source_text']) not in compact(page['text']):reasons.append('原文との照合が必要')
         item['review_reasons']=sorted(set(reasons));item['needs_review']=bool(reasons or old.get('needs_review'))
         if old.get('candidates'):item['candidates']=copy.deepcopy(old['candidates'])
+        for key in ('verified_against_original','verified_at','ai_confidence'):
+            if key in old:item[key]=copy.deepcopy(old[key])
         result['fields'][code]=item
     if raw.get('source'):result['source']=copy.deepcopy(raw['source'])
     return result
+
+
+def apply_review(data,review,digest,pages=None):
+    """Local original-document review overlays never alter the cached AI response."""
+    if review.get('file_hash')!=digest:raise ValueError('原本確認キャッシュが別のPDFです。')
+    result=copy.deepcopy(data)
+    for code,item in review.get('fields',{}).items():
+        if code not in MAPPING or item.get('verified_against_original') is not True or not item.get('verified_at'):
+            raise ValueError('管理規約の原本確認記録が不完全です。')
+        result['fields'][code]=copy.deepcopy(item)
+    if review.get('building_name'):result['building_name']=review['building_name']
+    return normalize(result,pages)
