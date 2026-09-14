@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const events={},timers=[],host={innerHTML:'',addEventListener:(n,f)=>events[n]=f};
+let picked=false,apiCalls=0;
+const forbidden=()=>{apiCalls++;throw Error('Public demo must not access API or file content');};
+const context={document:{querySelector:s=>s==='#demo-app'?host:{click:()=>picked=true}},setTimeout:f=>(timers.push(f),timers.length),clearTimeout:()=>{},fetch:forbidden,XMLHttpRequest:forbidden,FileReader:forbidden,localStorage:new Proxy({},{get:forbidden}),sessionStorage:new Proxy({},{get:forbidden})};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('web/demo-experience.js','utf8')+'\nglobalThis.test={start,reset,remaining,state:()=>({phase,names,answers})};',context);
+const test=context.test,click=(action,choice,index)=>events.click({target:{closest:()=>({disabled:false,dataset:{action,choice,index}})}});
+click('files');assert.ok(picked);
+const pdf={name:'建物.pdf',arrayBuffer:forbidden,text:forbidden,stream:forbidden};
+events.change({target:{id:'demo-files',files:[pdf]}});assert.equal(test.state().phase,'reading');timers.shift()();assert.equal(test.state().phase,'ready');assert.match(host.innerHTML,/建物.pdf/);
+test.reset();let prevented=false;
+events.drop({target:{closest:()=>true},preventDefault:()=>prevented=true,dataTransfer:{files:[pdf,pdf,{name:'土地.pdf'},{name:'違う.txt'}]}});
+assert.ok(prevented);assert.equal(test.state().names.length,2);assert.match(host.innerHTML,/PDF以外は追加できません/);timers.shift()();
+assert.equal(test.remaining(),3);click('generate');assert.equal(test.state().phase,'ready');
+for(const [i,id] of ['owner','fee','pet'].entries()){click(null,id,'1');assert.equal(test.remaining(),2-i);}
+assert.match(host.innerHTML,/すべて確認しました/);assert.doesNotMatch(host.innerHTML,/data-action="generate" disabled/);
+click('generate');assert.equal(test.state().phase,'generating');timers.shift()();assert.equal(test.state().phase,'done');assert.match(host.innerHTML,/href="\/demo-contract.xlsx" download=/);
+click('reset');assert.equal(test.state().phase,'empty');assert.equal(test.state().names.length,0);
+test.start([{name:'<script>.pdf'}]);assert.match(host.innerHTML,/&lt;script&gt;.pdf/);test.reset();timers.shift()();assert.equal(test.state().phase,'empty');
+assert.equal(apiCalls,0);
+console.log('PASS: selection, drop, rejection, simulated read, 3 choices/countdown, generation, download link, reset; AI/DB/file-content access 0');

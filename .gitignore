@@ -12,6 +12,8 @@ __pycache__/
 output/
 verification*/
 *.xlsx
+!web/demo-contract.xlsx
+*.inspect.ndjson
 *.xls
 *.zip
 *.log

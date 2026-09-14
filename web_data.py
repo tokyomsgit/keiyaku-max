@@ -201,6 +201,8 @@ class Workspace:
             from web_rules import conflicts
             from web_documents import pending_names
             c['source_conflicts']=conflicts(c)
+            from web_choices import decorate
+            decorate(self,c)
             c['pending_documents']=pending_names(self,c['id'])
             c['review_count']=sum(f['needs_review'] for d in c['documents'] for f in d['fields'])
             c['diff_count']=sum(d['review_status']=='unreviewed' for d in c['diffs'])

@@ -28,6 +28,12 @@ def make_server(workspace,port=8765):
         def do_GET(self):
             if not self.allowed():return self.send(403,{'error':'接続先が不正です。'})
             path=urlsplit(self.path).path
+            if path in ('/api/mapping','/api/mapping.csv'):
+                from web_mapping import inventory,export_csv
+                try:rows=inventory(workspace.template)
+                except (OSError,ValueError):return self.send(409,{'error':'ひな形・マッピング設定を確認してください。'})
+                if path.endswith('.csv'):return self.send(200,export_csv(rows),'text/csv; charset=utf-8','excel_mapping_status.csv')
+                return self.send(200,{'rows':rows})
             if path=='/api/state':
                 with workspace.lock:return self.send(200,{**workspace.public(),'csrf':token})
             if path.startswith('/download/'):
@@ -78,7 +84,10 @@ def make_server(workspace,port=8765):
                     return self.send(200,result)
                 if not 0<size<(65536 if urlsplit(self.path).path=='/api/verify-purchase' else 8192):raise ValueError()
                 p=json.loads(self.rfile.read(size));path=urlsplit(self.path).path
-                if path=='/api/decision':result=workspace.decide(p['case_id'],p['diff_id'],p['action'])
+                if path=='/api/choice':
+                    from web_choices import choose
+                    with workspace.lock:result=choose(workspace,p['case_id'],p['kind'],p['key'],p['source'])
+                elif path=='/api/decision':result=workspace.decide(p['case_id'],p['diff_id'],p['action'])
                 elif path=='/api/generate':result=workspace.generate(p['case_id'])
                 elif path=='/api/verify-purchase':
                     from web_purchase import verify_fields

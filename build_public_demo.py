@@ -52,18 +52,27 @@ def fixture():
 
 def build():
     OUT.mkdir(exist_ok=True)
-    index=(ROOT/'web/index.html').read_text(encoding='utf8').replace('<script src="/app.js">','<script src="/public-demo.js"></script><script src="/app.js">')
-    index=index.replace('読取済みの資料を確認し、差分を採用してからExcelを生成します。','案件・資料・差分の確認をお試しいただけます。Excel生成はローカル版で利用できます。')
-    assets={'index.html':index,'demo.json':json.dumps(fixture(),ensure_ascii=False,indent=2)}
-    for name in ('app.js','style.css','public-demo.js'):assets[name]=(ROOT/'web'/name).read_text(encoding='utf8')
+    assets={'index.html':(ROOT/'web/demo-experience.html').read_text(encoding='utf8'),
+            'app.js':(ROOT/'web/demo-experience.js').read_text(encoding='utf8')}
     # Publish the same styles as one asset; keep editable source files separate.
     assets['style.css']='\n'.join((ROOT/'web/styles'/f'{name}.css').read_text(encoding='utf8') for name in ('theme','base','layout','components'))
-    forbidden=r'(?i)(SUPABASE_SERVICE_ROLE_KEY|sk-proj-|sb_secret_|eyJ[a-zA-Z0-9_-]{20}|[A-Z]:[\\/]|127\.0\.0\.1|localhost|\.env|NITOH|東京都|文京区|渋谷区|日本管財)'
+    assets['style.css']+='\n'+(ROOT/'web/demo-experience.css').read_text(encoding='utf8')
+    forbidden=r'(?i)(SUPABASE_SERVICE_ROLE_KEY|sk-proj-|sb_secret_|eyJ[a-zA-Z0-9_-]{20}|(?<![a-z])[A-Z]:[\\/]|127\.0\.0\.1|localhost|\.env|NITOH|東京都|文京区|渋谷区|日本管財)'
     for name,content in assets.items():
         if re.search(forbidden,content):raise ValueError('Publish audit failed: '+name)
-    if any(p.name not in assets or not p.is_file() for p in OUT.iterdir()):raise ValueError('Unexpected publish artifact')
+    # Remove only the obsolete, known generated demo assets.
+    for obsolete in ('demo.json','public-demo.js'):
+        (OUT/obsolete).unlink(missing_ok=True)
+    if any(p.name not in {*assets,'demo-contract.xlsx'} or not p.is_file() for p in OUT.iterdir()):raise ValueError('Unexpected publish artifact')
+    import zipfile
+    workbook=ROOT/'web/demo-contract.xlsx'
+    with zipfile.ZipFile(workbook) as z:
+        for name in z.namelist():
+            if 'externalLinks' in name or 'vbaProject' in name:raise ValueError('Unsafe demo workbook')
+            if name.endswith(('.xml','.rels')) and re.search(forbidden,z.read(name).decode('utf8')):raise ValueError('Workbook privacy audit failed')
     for name,content in assets.items():(OUT/name).write_text(content,encoding='utf8')
-    print('Public demo build and privacy audit: PASS (5 static files, no API/DB access)')
+    (OUT/'demo-contract.xlsx').write_bytes(workbook.read_bytes())
+    print('Public demo build and privacy audit: PASS (4 static files, no API/DB access)')
 
 
 if __name__=='__main__':build()
