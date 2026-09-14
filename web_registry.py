@@ -1,3 +1,4 @@
+from web_reading import read_existing
 """Local upload adapter for the installed registry reader and cached results."""
 import copy
 import hashlib
@@ -98,10 +99,10 @@ def upload(workspace,files):
         pdf=folder/'source.pdf';pdf.write_bytes(content)
         if data is None:
             key=env('OPENAI_API_KEY')
-            if not key:raise StoreError('初期設定が完了していません。管理者へ連絡してください。')
+            if not key:raise StoreError('API設定不足：管理者がOPENAI_API_KEYを設定してください。')
             os.environ['OPENAI_API_KEY']=key
             workspace.ai_calls+=1
-            data=extract_registry(pdf,folder)
+            data=read_existing(extract_registry,pdf,folder)
         docs[str(i)]=copy.deepcopy(data);docs[str(i)].setdefault('metadata',{})
         def tag(node):
             if isinstance(node,dict):

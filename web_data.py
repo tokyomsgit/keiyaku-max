@@ -70,7 +70,7 @@ LABELS.update({k:v['label'] for k,v in PURCHASE_MAPPING.items()})
 
 class Workspace:
     def __init__(self,demo=None):
-        load_env();self.demo=flag('DEMO_MODE',True) if demo is None else demo
+        load_env();self.demo=flag('DEMO_MODE',False) if demo is None else demo
         self.remote=not self.demo or flag('DEMO_WRITE_DB')
         self.reads=0;self.writes=0;self.ai_calls=0;self.lock=threading.RLock();self.cases=[];self.raw={};self.unmatched=[];self.files={}
         self.template=Path(env('CONTRACT_TEMPLATE') or ROOT.parent/'契約書ひな形_名前定義版.xlsm')

@@ -1,3 +1,4 @@
+from web_reading import read_existing
 """Case-scoped report upload. Reuses the existing reader and transactional store."""
 import copy
 import hashlib
@@ -85,7 +86,7 @@ def upload(workspace, cid, files):
         if data is None:
             from important_report_reader import read_report
             workspace.ai_calls += 1
-            data = read_report(pdf, workspace.output/'report_cache')
+            data = read_existing(read_report,pdf, workspace.output/'report_cache')
         else:
             reused += 1
         data = copy.deepcopy(data)

@@ -1,3 +1,4 @@
+from web_reading import read_existing
 """Management rules use the selected case's building, never a name lookup."""
 import copy
 import hashlib
@@ -35,7 +36,7 @@ def prepare(workspace,filename,content):
     if data is None:
         from management_rules_reader import read_rules
         def count():workspace.ai_calls+=1
-        data=read_rules(pdf,workspace.output/'rules_cache',on_api=count)
+        data=read_existing(read_rules,pdf,workspace.output/'rules_cache',on_api=count)
     data=copy.deepcopy(data);data['source'].update(original_filename=filename,storage_path=str(pdf.resolve()))
     (folder/'extracted_normalized.json').write_text(json.dumps(data,ensure_ascii=False),encoding='utf8')
     return data,reused

@@ -1,3 +1,4 @@
+from web_reading import read_existing
 """Purchase baseline adapters; Excel consumes case-selected evidence only."""
 import copy
 import hashlib
@@ -121,7 +122,7 @@ def upload(w,cid,files):
                 if item.get('verified_at','')>merged.get(code,{}).get('verified_at',''):merged[code]=item
             target.write_text(json.dumps({**incoming,**current,'fields':merged},ensure_ascii=False),encoding='utf8')
     def count():w.ai_calls+=1
-    data=read_purchase(pdf,w.output/'purchase_cache',on_api=count,allow_api=not w.demo)
+    data=read_existing(read_purchase,pdf,w.output/'purchase_cache',on_api=count,allow_api=not w.demo)
     data['source'].update(original_filename=name.replace('\\','/').rsplit('/',1)[-1],storage_path=str(pdf.resolve()))
     cid=stage(w,data)
     return {'state':w.public(),'case_id':cid,'reused':int(data['source']['cache_reused'])}
