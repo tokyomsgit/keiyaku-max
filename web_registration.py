@@ -164,4 +164,6 @@ def register(workspace,token,case_mode,resume_case_id=None):
     (folder/'registration.json').write_text(canonical(result),encoding='utf8')
     workspace.cases=[c for c in workspace.cases if c['id']!=pending['cid']]
     workspace.raw.pop(pending['cid'],None)
-    return {'state':workspace.public(),'case_id':result['case_id'],'registration':result}
+    from web_documents import flush
+    warning=flush(workspace,pending['cid'],result['case_id'])
+    return {'state':workspace.public(),'case_id':result['case_id'],'registration':result,'warning':warning}

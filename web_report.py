@@ -93,6 +93,9 @@ def upload(workspace, cid, files):
         (folder/'extracted_normalized.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf8')
         if workspace.remote:
             from important_report_store import make_payload
+            house=data.get('house_number')
+            known=workspace.raw.get(cid,{}).get('unit',{}).get('house_number') if hasattr(workspace,'raw') else None
+            if house and known and house!=known:raise StoreError('重調の家屋番号が案件と一致しません。別住戸への保存を停止しました。')
             payload = make_payload(data, unit_id=case['unit_id'])
             result = workspace.rpc('rpc/save_important_report', payload, write=True)
             if not isinstance(result,dict) or not result.get('document_version_id'):

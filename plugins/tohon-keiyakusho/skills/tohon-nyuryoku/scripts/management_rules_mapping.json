@@ -1,0 +1,72 @@
+{
+  "unit_use_restrictions": {
+    "label": "専有部分の用途制限",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "office_use_allowed": {
+    "label": "事務所利用",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "pet_restrictions": {
+    "label": "ペット制限",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "instrument_restrictions": {
+    "label": "楽器制限",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "balcony_exclusive_use": {
+    "label": "バルコニー専用使用",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "private_garden_rules": {
+    "label": "専用庭",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "door_window_exclusive_use": {
+    "label": "玄関扉・窓の専用使用",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "parking_rules": {
+    "label": "駐車場規則",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "renovation_restrictions": {
+    "label": "リフォーム制限",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "leasing_restrictions": {
+    "label": "賃貸制限",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "management_association_name": {
+    "label": "管理組合名",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "voting_rights_rule": {
+    "label": "議決権",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "rules_effective_date": {
+    "label": "規約施行日",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "related_rules": {
+    "label": "関連する使用細則",
+    "entity_level": "building",
+    "excel_named_range": null
+  }
+}

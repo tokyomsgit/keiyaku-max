@@ -45,7 +45,7 @@ def make_server(workspace,port=8765):
                 return self.send(403,{'error':'画面を再読込してください。'})
             try:
                 size=int(self.headers.get('Content-Length','0'))
-                if urlsplit(self.path).path in ('/api/upload-registry','/api/upload-report'):
+                if urlsplit(self.path).path in ('/api/upload-registry','/api/upload-report','/api/upload-documents'):
                     if not 0<size<=40*1024*1024:raise StoreError('PDF合計サイズは40MB以内にしてください。')
                     from email.parser import BytesParser
                     from email.policy import default
@@ -55,7 +55,13 @@ def make_server(workspace,port=8765):
                     message=BytesParser(policy=default).parsebytes(('Content-Type: '+content_type+'\r\nMIME-Version: 1.0\r\n\r\n').encode()+self.rfile.read(size))
                     files=[(p.get_filename(),p.get_payload(decode=True)) for p in message.iter_parts() if p.get_filename()]
                     with workspace.lock:
-                        if urlsplit(self.path).path=='/api/upload-report':
+                        if urlsplit(self.path).path=='/api/upload-documents':
+                            from web_documents import upload as upload_documents
+                            form={part.get_param('name',header='content-disposition'):part.get_content() for part in message.iter_parts() if not part.get_filename()}
+                            kinds=json.loads(form.get('kinds','[]'))
+                            if len(kinds)!=len(files):raise ValueError()
+                            result=upload_documents(workspace,form.get('case_id'),[(k,n,v) for k,(n,v) in zip(kinds,files)])
+                        elif urlsplit(self.path).path=='/api/upload-report':
                             from web_report import upload as upload_report
                             cid=next((part.get_content() for part in message.iter_parts() if part.get_param('name',header='content-disposition')=='case_id' and not part.get_filename()),None)
                             if not isinstance(cid,str) or len(cid)>200:raise ValueError()
@@ -72,6 +78,11 @@ def make_server(workspace,port=8765):
                 elif path=='/api/register-case':
                     from web_registration import register
                     with workspace.lock:result=register(workspace,p['token'],p['case_mode'],p.get('resume_case_id'))
+                elif path=='/api/retry-documents':
+                    from web_documents import flush
+                    with workspace.lock:
+                        workspace.case(p['case_id']);warning=flush(workspace,p['case_id'],p['case_id'])
+                        result={'state':workspace.public(),'case_id':p['case_id'],'warning':warning}
                 elif path=='/api/refresh':
                     with workspace.lock:workspace.refresh();result=workspace.public()
                 else:return self.send(404,{'error':'操作がありません。'})

@@ -16,6 +16,7 @@ sys.path.insert(0,str(SCRIPTS))
 from supabase_store import env,canonical,NoRedirect,StoreError,convert
 from important_report_schema import MAPPING
 from important_report_store import write_named_excel
+from management_rules_schema import MAPPING as RULES_MAPPING
 
 
 def load_env():
@@ -60,6 +61,8 @@ def field_view(code,item):
     item['excel_supported']=code not in MAPPING or bool(MAPPING[code]['excel_named_range'])
     return item
 
+LABELS.update({k:v['label'] for k,v in RULES_MAPPING.items() if k not in LABELS})
+
 
 class Workspace:
     def __init__(self,demo=None):
@@ -75,6 +78,8 @@ class Workspace:
         if not self.remote:
             from web_report import restore as restore_reports
             restore_reports(self)
+            from web_rules import restore as restore_rules
+            restore_rules(self)
 
     def rpc(self,name,p=None,write=False):
         url,key=env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY')
@@ -132,25 +137,28 @@ class Workspace:
             b=buildings[unit['building_id']];documents=[]
             for vid,v in versions.items():
                 d=docs[v['document_id']]
-                if d.get('unit_id')!=unit['unit_id']:continue
+                if d.get('unit_id')!=unit['unit_id'] and not (d['document_type']=='management_rules' and d.get('building_id')==unit['building_id'] and d.get('unit_id') is None):continue
                 values=[]
                 for e in s['values']:
                     if e['document_version_id']!=vid:continue
-                    meta=(v.get('important_raw_json') or {}).get('fields',{}).get(e['field_code'],{})
+                    meta=(v.get('important_raw_json') or v.get('management_rules_raw_json') or {}).get('fields',{}).get(e['field_code'],{})
                     provenance=e.get('registry_provenance') or {}
                     values.append(field_view(e['field_code'],{**meta,**e,'needs_review':bool(meta.get('needs_review') or provenance.get('needs_review'))}))
+                    if d['document_type']=='management_rules':values[-1]['excel_supported']=False
                 documents.append({'id':d['document_id'],'version_id':vid,'type':d['document_type'],'filename':v.get('original_filename'),
                   'version':v['version_no'],'date':v.get('as_of_date') or v.get('uploaded_at'),'fields':values})
             diffs=[]
             for x in s['diffs']:
-                if docs[x['document_id']].get('unit_id')!=unit['unit_id']:continue
+                document=docs[x['document_id']]
+                if document.get('unit_id')!=unit['unit_id'] and not (document['document_type']=='management_rules' and document.get('building_id')==unit['building_id'] and document.get('unit_id') is None):continue
                 e=next((e for e in s['values'] if e['document_version_id']==x['new_version_id'] and e['field_code']==x['field_code']),{})
-                meta=(versions.get(x['new_version_id'],{}).get('important_raw_json') or {}).get('fields',{}).get(x['field_code'],{})
+                version=versions.get(x['new_version_id'],{})
+                meta=(version.get('important_raw_json') or version.get('management_rules_raw_json') or {}).get('fields',{}).get(x['field_code'],{})
                 provenance=e.get('registry_provenance') or {}
                 trusted=not field_view(x['field_code'],{**meta,**e,'needs_review':bool(meta.get('needs_review') or provenance.get('needs_review'))})['needs_review']
                 diffs.append({**x,'id':x['diff_id'],'code':x['field_code'],'label':LABELS.get(x['field_code'],x['field_code']),
-                  'can_adopt':trusted,'source':versions.get(x['new_version_id'],{}).get('original_filename')})
-            c={'id':case['case_id'],'unit_id':unit['unit_id'],'building_name':b.get('building_name'),'unit_name':unit.get('unit_name'),
+                  'can_adopt':trusted,'document_type':document['document_type'],'source':versions.get(x['new_version_id'],{}).get('original_filename')})
+            c={'id':case['case_id'],'unit_id':unit['unit_id'],'building_id':unit['building_id'],'building_name':b.get('building_name'),'unit_name':unit.get('unit_name'),
               'address':b.get('display_address') or b.get('registry_location'),'owner':unit.get('current_owner_name'),'area':unit.get('registered_area'),
               'status':case.get('case_status') or '確認中','updated_at':case.get('updated_at') or unit.get('updated_at'),'documents':documents,'diffs':diffs}
             self.cases.append(c)
@@ -171,13 +179,17 @@ class Workspace:
                 self.raw[c['id']]={'uploaded':normalized,'registered':True,'unit':unit,'building':b,'report_fields':report_fields}
             else:self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
         for d in docs.values():
-            if not d.get('unit_id'):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
+            if not d.get('unit_id') and not (d['document_type']=='management_rules' and d.get('building_id')):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
         from web_registry import restore
         restore(self)
 
     def public(self):
         result=copy.deepcopy(self.cases)
         for c in result:
+            from web_rules import conflicts
+            from web_documents import pending_names
+            c['source_conflicts']=conflicts(c)
+            c['pending_documents']=pending_names(self,c['id'])
             c['review_count']=sum(f['needs_review'] for d in c['documents'] for f in d['fields'])
             c['diff_count']=sum(d['review_status']=='unreviewed' for d in c['diffs'])
         return {'mode':'demo' if self.demo else 'live','db_write_enabled':self.remote,'cases':result,'unmatched':self.unmatched,
@@ -195,7 +207,8 @@ class Workspace:
             if diff['review_status'] in ('applied','ignored'):raise StoreError('処理済みの差分です。')
             if action=='adopt' and not diff.get('can_adopt'):raise StoreError('根拠が不明なため採用できません。原本確認が必要です。')
             if self.remote:
-                self.rpc('rpc/web_review_diff',{'diff_id':did,'unit_id':c['unit_id'],'action':action},write=True)
+                if diff.get('document_type')=='management_rules':self.rpc('rpc/review_management_rules_diff',{'diff_id':did,'case_id':cid,'action':action},write=True)
+                else:self.rpc('rpc/web_review_diff',{'diff_id':did,'unit_id':c['unit_id'],'action':action},write=True)
                 self.refresh()
             else:
                 if action=='adopt':
@@ -209,6 +222,8 @@ class Workspace:
 
     def generate(self,cid):
         with self.lock:
+            from web_documents import pending_names
+            if self.remote and pending_names(self,cid):raise StoreError('未保存の追加資料があります。物件・資料で保存を完了してください。')
             c=self.case(cid);raw=self.raw[cid]
             if 'uploaded' in raw:
                 from web_registry import generate

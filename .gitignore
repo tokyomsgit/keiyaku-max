@@ -1,5 +1,6 @@
 .DS_Store
 .netlify/
+supabase/.temp/
 public-demo-dist/
 __pycache__/
 *.pyc
