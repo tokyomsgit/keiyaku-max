@@ -1,0 +1,13 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const elements=new Map();const el=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',addEventListener(){}});return elements.get(id)};
+const context={document:{querySelector:el},window:{addEventListener(){}},fetch:()=>new Promise(()=>{}),URLSearchParams,location:{hash:''},console};
+vm.runInNewContext(fs.readFileSync(__dirname+'/web/app.js','utf8')+`\nglobalThis.ui={fieldRows,renderExcel,renderReview,renderDetail,renderList,renderDocuments,nextWork,docName,setState:s=>state=s,results};`,context);
+const ui=context.ui;const c={id:'test',building_name:'サンプル',unit_name:'101',documents:[{type:'registry',filename:'registry.json',version_id:'v',fields:[{code:'house_number',label:'家屋番号',value:'1番101',confidence:.99,excel_supported:true},{code:'built_date',label:'新築年月日',value:null,confidence:null,needs_review:true}]}],diffs:[],diff_count:0};
+ui.setState({mode:'demo',public_demo:false,cases:[c],unmatched:[]});
+const rows=c.documents.flatMap(d=>d.fields.map(f=>({d,f}))),before=JSON.stringify(c);const html=ui.fieldRows(rows);
+assert(html.includes('<summary>根拠</summary>'));assert(!html.includes('<details open'));assert(!html.includes('house_number'));assert(!html.includes('99%'));assert(html.includes('未取得'));assert.equal(ui.docName(c.documents[0]),'謄本（解析済み資料）');
+const panel={innerHTML:''};ui.renderExcel({...c,generation_blocked:true},panel);assert(panel.innerHTML.includes('生成不可'));assert(/data-action="generate" disabled/.test(panel.innerHTML));
+ui.renderExcel(c,panel);assert(!/data-action="generate" disabled/.test(panel.innerHTML));
+ui.setState({mode:'demo',public_demo:true,cases:[c],unmatched:[]});ui.renderExcel(c,panel);assert(/data-action="generate" disabled/.test(panel.innerHTML));
+ui.renderDetail(c,panel);assert(panel.innerHTML.includes(' multiple hidden disabled'));assert(panel.innerHTML.includes('重調PDFの読取はこの画面では未対応'));
+assert.equal(JSON.stringify(c),before);console.log('PASS: collapsed evidence, hidden technical fields, missing status, generation guard, public restrictions, immutable input');
