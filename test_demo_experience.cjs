@@ -10,14 +10,13 @@ const test=context.test,click=(action,choice,index)=>events.click({target:{close
 click('files');assert.ok(picked);
 const pdf={name:'建物.pdf',arrayBuffer:forbidden,text:forbidden,stream:forbidden};
 events.change({target:{id:'demo-files',files:[pdf]}});assert.equal(test.state().phase,'reading');timers.shift()();assert.equal(test.state().phase,'ready');assert.match(host.innerHTML,/建物.pdf/);
-assert.ok(scrolled);assert.match(host.innerHTML,/建物謄本・2026年1月31日・1ページ/);
+assert.ok(scrolled);assert.match(host.innerHTML,/建物謄本・2026年1月31日・1ページ/);assert.doesNotMatch(host.innerHTML,/管理費/);
 test.reset();let prevented=false;
 events.drop({target:{closest:()=>true},preventDefault:()=>prevented=true,dataTransfer:{files:[pdf,pdf,{name:'土地.pdf'},{name:'違う.txt'}]}});
 assert.ok(prevented);assert.equal(test.state().names.length,2);assert.match(host.innerHTML,/PDF以外は追加できません/);timers.shift()();
 assert.equal(test.remaining(),3);click('generate');assert.equal(test.state().phase,'ready');
-for(const [i,id] of ['owner','fee','pet'].entries()){click(null,id,'1');assert.equal(test.remaining(),2-i);}
+for(const [i,id] of ['owner','fee','pet'].entries()){click(null,id,'1');assert.equal(test.remaining(),2-i);if(i===0)assert.match(host.innerHTML,/管理費/);}
 assert.match(host.innerHTML,/すべて確認しました/);assert.doesNotMatch(host.innerHTML,/data-action="generate" disabled/);
-click(null,'fee','0');assert.equal(test.remaining(),0);assert.match(host.innerHTML,/12,000円/);assert.match(host.innerHTML,/✓ この値を使用中/);
 click('generate');assert.equal(test.state().phase,'generating');timers.shift()();assert.equal(test.state().phase,'done');assert.match(host.innerHTML,/href="\/demo-contract.xlsx" download=/);
 assert.ok(downloaded);
 click('reset');assert.equal(test.state().phase,'empty');assert.equal(test.state().names.length,0);
