@@ -19,6 +19,7 @@ function readCallback(){
   if(p.get('error_description')) authError.textContent=p.get('error_description');
 }
 function session(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');}catch{return null;}}
+if(typeof window!=='undefined')window.KeiyakuAuth={token:()=>session()?.access_token||null};
 function showLogin(message=''){
   sessionStorage.removeItem(SESSION_KEY); login.hidden=false; protectedArea.hidden=true; logout.hidden=true;
   authUser.textContent='実運用テスト'; authError.textContent=message;
@@ -26,6 +27,7 @@ function showLogin(message=''){
 function showApp(user){
   login.hidden=true; protectedArea.hidden=false; logout.hidden=false;
   authUser.textContent=user.email||'ログイン中';
+  if(typeof window!=='undefined'&&typeof CustomEvent!=='undefined')window.dispatchEvent(new CustomEvent('keiyaku-auth-ready',{detail:{email:user.email||''}}));
 }
 async function verify(){
   const current=session();

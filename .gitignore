@@ -5,6 +5,7 @@ public-demo-dist/
 __pycache__/
 *.pyc
 *.xlsm
+!supabase/functions/keiyaku-api/contract-template.xlsm
 *.pdf
 .env
 .env.*

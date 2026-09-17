@@ -1,6 +1,6 @@
 [build]
   publish = "public-demo-dist"
-  command = "python build_public_demo.py"
+  command = "python build_live_app.py"
 
 [[headers]]
   for = "/*"
@@ -8,4 +8,4 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "no-referrer"
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://afdtohxuzuwlqmjbrpar.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://afdtohxuzuwlqmjbrpar.supabase.co"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://afdtohxuzuwlqmjbrpar.supabase.co https://ugnkhzjswjqszmzzpelz.supabase.co; frame-ancestors 'none'; base-uri 'none'; form-action 'self' https://afdtohxuzuwlqmjbrpar.supabase.co"
