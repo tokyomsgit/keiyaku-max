@@ -116,12 +116,19 @@ async function sheetPathFor(zip, workbook, rels, sheetName) {
   return relMatch[1].startsWith('/') ? relMatch[1].slice(1) : `xl/${relMatch[1].replace(/^\.\//, '')}`;
 }
 
-const ZONE_LETTERS = ['A', 'B', 'C'];
+const ZONE_LETTERS = ['A', 'B', 'C', 'D'];
 const toHalfWidth = value => String(value ?? '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 const zoneKey = value => toHalfWidth(value).replace(/\s+/g, '');
 const NOT_APPLICABLE = new Set(['', 'なし', '該当なし', '無', '不明', '-', '－', 'ー'].map(zoneKey));
 const isApplicable = value => value != null && !NOT_APPLICABLE.has(zoneKey(value));
 const markerFor = letters => letters.map(l => `(${l})`).join('');
+// building_coverage_ratio/floor_area_ratio/height_district/minimum_height_district/
+// minimum_lot_area each have a fixed number of (value, marker) cell slots in the template
+// (see zoning_excel_map.mjs) — unlike the checkbox items, which just concatenate letters
+// into one marker cell and so have no real capacity limit. A rare 3-4 zone property can have
+// more distinct values than slots; those are left for the agent to fill in by hand rather
+// than silently dropped, noted in the BI166 confirmation sentence alongside the boundary note.
+const FIELD_LABELS = { building_coverage_ratio: '建ぺい率', floor_area_ratio: '容積率', height_district: '高度地区', minimum_height_district: '最低限高度地区', minimum_lot_area: '敷地面積の最低限度' };
 
 function zoneValue(zone, code) {
   const item = (zone.fields || []).find(f => f.code === code);
@@ -157,35 +164,47 @@ function planZoningChecklist(put, zones, code, table, multi) {
   }
 }
 
-function planHeightDistrict(put, zones, multi) {
+function planHeightDistrict(put, zones, multi, overflow) {
   const groups = groupZones(zones, 'height_district');
   groups.slice(0, ZMAP.HEIGHT_DISTRICT_SLOTS.length).forEach((group, index) => {
     const slot = ZMAP.HEIGHT_DISTRICT_SLOTS[index];
     put(slot.box, '■'); put(slot.value, group.value);
     if (multi) put(slot.marker, markerFor(group.letters));
   });
+  if (groups.length > ZMAP.HEIGHT_DISTRICT_SLOTS.length)
+    overflow.push({ label: FIELD_LABELS.height_district, capacity: ZMAP.HEIGHT_DISTRICT_SLOTS.length, groups: groups.slice(ZMAP.HEIGHT_DISTRICT_SLOTS.length) });
   const minGroups = groupZones(zones, 'minimum_height_district');
   if (minGroups.length) {
     put(ZMAP.MIN_HEIGHT_DISTRICT.box, '■'); put(ZMAP.MIN_HEIGHT_DISTRICT.value, minGroups[0].value);
     if (multi) put(ZMAP.MIN_HEIGHT_DISTRICT.marker, markerFor(minGroups[0].letters));
+    if (minGroups.length > 1) overflow.push({ label: FIELD_LABELS.minimum_height_district, capacity: 1, groups: minGroups.slice(1) });
   }
 }
 
-function planRatio(put, zones, code, slots) {
-  groupZones(zones, code).slice(0, slots.length).forEach((group, index) => {
+function planRatio(put, zones, code, slots, overflow) {
+  const groups = groupZones(zones, code);
+  groups.slice(0, slots.length).forEach((group, index) => {
     const [valueCell, markerCell] = slots[index];
     const number = Number(String(group.value).replace(/[^\d.]/g, ''));
     if (Number.isFinite(number)) put(valueCell, number);
     if (zones.length > 1) put(markerCell, markerFor(group.letters));
   });
+  if (groups.length > slots.length) overflow.push({ label: FIELD_LABELS[code], capacity: slots.length, groups: groups.slice(slots.length) });
 }
 
-function planMinLotArea(put, zones) {
+function planMinLotArea(put, zones, overflow) {
   const groups = groupZones(zones, 'minimum_lot_area');
   if (!groups.length) return;
   const number = Number(String(groups[0].value).replace(/[^\d.]/g, ''));
-  if (!Number.isFinite(number)) return;
-  put(ZMAP.MIN_LOT_AREA.yes, '■'); put(ZMAP.MIN_LOT_AREA.no, '□'); put(ZMAP.MIN_LOT_AREA.value, number);
+  if (Number.isFinite(number)) { put(ZMAP.MIN_LOT_AREA.yes, '■'); put(ZMAP.MIN_LOT_AREA.no, '□'); put(ZMAP.MIN_LOT_AREA.value, number); }
+  if (groups.length > 1) overflow.push({ label: FIELD_LABELS.minimum_lot_area, capacity: 1, groups: groups.slice(1) });
+}
+
+// "建ぺい率は3件までしか自動反映できないため、(D)60%は手入力してください。" per overflowing field.
+function overflowNote(overflow) {
+  return overflow.map(({ label, capacity, groups }) =>
+    `${label}は${capacity}件までしか自動反映できないため、${groups.map(g => `${markerFor(g.letters)}${g.value}`).join('、')}は手入力してください。`
+  ).join(' ');
 }
 
 // Only touches the 重説 sheet's zoning section; everything else in the template is untouched.
@@ -196,19 +215,25 @@ export function planZoning(zones) {
   const put = (cell, value) => { cells[cell] = value; };
   if (!Array.isArray(zones) || !zones.length) return cells;
   const multi = zones.length > 1;
+  const overflow = [];
   planZoningChecklist(put, zones, 'zoning_type', ZMAP.ZONING_TYPES, multi);
   planZoningChecklist(put, zones, 'fire_zone', { '防火地域': ZMAP.DISTRICT_TYPES['防火地域'] }, multi);
   planZoningChecklist(put, zones, 'semi_fire_zone', { '準防火地域': ZMAP.DISTRICT_TYPES['準防火地域'] }, multi);
   planZoningChecklist(put, zones, 'special_use_district', { '特別用途地区': ZMAP.DISTRICT_TYPES['特別用途地区'] }, multi);
   planZoningChecklist(put, zones, 'height_use_district', { '高度利用地区': ZMAP.DISTRICT_TYPES['高度利用地区'] }, multi);
   planZoningChecklist(put, zones, 'district_plan', { '地区計画区域': ZMAP.DISTRICT_TYPES['地区計画区域'] }, multi);
-  planRatio(put, zones, 'building_coverage_ratio', ZMAP.RATIO_SLOTS.building_coverage_ratio);
-  planRatio(put, zones, 'floor_area_ratio', ZMAP.RATIO_SLOTS.floor_area_ratio);
-  planHeightDistrict(put, zones, multi);
-  planMinLotArea(put, zones);
+  planRatio(put, zones, 'building_coverage_ratio', ZMAP.RATIO_SLOTS.building_coverage_ratio, overflow);
+  planRatio(put, zones, 'floor_area_ratio', ZMAP.RATIO_SLOTS.floor_area_ratio, overflow);
+  planHeightDistrict(put, zones, multi, overflow);
+  planMinLotArea(put, zones, overflow);
   // The template's own BI166 sentence needs the road side/distance a human determines from
-  // the site; multiple zones just means the boundary note applies and must be checked.
-  if (multi) put(ZMAP.BI166, '【要確認】用途地域が複数のため、本物件の道路との位置関係を確認し、この文言を修正してください。');
+  // the site; multiple zones just means the boundary note applies and must be checked. Any
+  // field that ran out of slots (see overflowNote) gets its own sentence appended here too,
+  // since this is the only free-text confirmation cell available in the 重説 zoning section.
+  if (multi) {
+    const note = overflowNote(overflow);
+    put(ZMAP.BI166, '【要確認】用途地域が複数のため、本物件の道路との位置関係を確認し、この文言を修正してください。' + (note ? ' ' + note : ''));
+  }
   return cells;
 }
 

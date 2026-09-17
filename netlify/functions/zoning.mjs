@@ -7,7 +7,7 @@
 // single-zone certificates has no relation to which side is actually "A".
 import { Failure, UUID, authenticate, db, reply } from '../lib/common.mjs';
 
-const ZONE_LETTERS = ['A', 'B', 'C'];
+const ZONE_LETTERS = ['A', 'B', 'C', 'D'];
 
 async function resolveBuildingId(caseId) {
   const raw = String(caseId || '');

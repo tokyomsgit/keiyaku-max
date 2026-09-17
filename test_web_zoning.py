@@ -144,14 +144,18 @@ class ZoningMergeTest(unittest.TestCase):
         self.assertEqual(len(self.w.tables['document_versions']), 1)
         self.assertEqual(len(self.w.tables['extracted_values'][-1]['value']), 1)
 
-    def test_three_zones_rejects_a_fourth(self):
-        with patch('zoning_reader.read_zoning', side_effect=[_parsed('商業地域'), _parsed('近隣商業地域'), _parsed('準工業地域'), _parsed('工業地域')]):
+    def test_four_zones_ok_but_a_fifth_is_rejected(self):
+        # Rare but real: a property can straddle up to four 用途地域 (A-D).
+        with patch('zoning_reader.read_zoning', side_effect=[_parsed('商業地域'), _parsed('近隣商業地域'), _parsed('準工業地域'), _parsed('工業地域'), _parsed('工業専用地域')]):
             upload(self.w, 'case-1', [('a.pdf', blank_pdf(200))])
             upload(self.w, 'case-1', [('b.pdf', blank_pdf(210))])
             upload(self.w, 'case-1', [('c.pdf', blank_pdf(220))])
+            upload(self.w, 'case-1', [('d.pdf', blank_pdf(230))])
+            latest = self.w.tables['extracted_values'][-1]['value']
+            self.assertEqual([z['zone_label'] for z in latest], ['A', 'B', 'C', 'D'])
             from web_data import StoreError
             with self.assertRaises(StoreError):
-                upload(self.w, 'case-1', [('d.pdf', blank_pdf(230))])
+                upload(self.w, 'case-1', [('e.pdf', blank_pdf(240))])
 
 
 if __name__ == '__main__':

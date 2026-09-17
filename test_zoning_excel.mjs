@@ -45,6 +45,25 @@ assert.equal(single.CK104, undefined);
 assert.equal(single.BI166, undefined);
 console.log('PASS single-zone case writes no (A)/(B) markers and leaves BI166 untouched');
 
+// Rare 4-zone case: 容積率 has 4 distinct values (only 3 slots) and 高度地区 has 3 distinct
+// values (only 2 slots). The slots that exist must still auto-fill; whatever doesn't fit must
+// be left for the agent to enter by hand, named explicitly in BI166 rather than silently lost.
+const fourZonesOverflowing = [
+  { zone_label: null, needs_review: false, fields: [{ code: 'zoning_type', value: '商業地域', needs_review: false }, { code: 'floor_area_ratio', value: '200%', needs_review: false }, { code: 'height_district', value: '10m', needs_review: false }] },
+  { zone_label: null, needs_review: false, fields: [{ code: 'zoning_type', value: '商業地域', needs_review: false }, { code: 'floor_area_ratio', value: '300%', needs_review: false }, { code: 'height_district', value: '20m', needs_review: false }] },
+  { zone_label: null, needs_review: false, fields: [{ code: 'zoning_type', value: '商業地域', needs_review: false }, { code: 'floor_area_ratio', value: '400%', needs_review: false }, { code: 'height_district', value: '30m', needs_review: false }] },
+  { zone_label: null, needs_review: false, fields: [{ code: 'zoning_type', value: '商業地域', needs_review: false }, { code: 'floor_area_ratio', value: '500%', needs_review: false }] },
+];
+const overflowCells = planZoning(fourZonesOverflowing);
+assert.equal(overflowCells.BW130, 200); assert.equal(overflowCells.CB130, '(A)');
+assert.equal(overflowCells.CF130, 300); assert.equal(overflowCells.CK130, '(B)');
+assert.equal(overflowCells.CO130, 400); assert.equal(overflowCells.CT130, '(C)');
+assert.equal(overflowCells.BI114, '■'); assert.equal(overflowCells.BP114, '10m'); assert.equal(overflowCells.BV114, '(A)');
+assert.equal(overflowCells.BI116, '■'); assert.equal(overflowCells.BP116, '20m'); assert.equal(overflowCells.BV116, '(B)');
+assert.ok(overflowCells.BI166.includes('容積率は3件までしか自動反映できないため、(D)500%は手入力してください。'));
+assert.ok(overflowCells.BI166.includes('高度地区は2件までしか自動反映できないため、(C)30mは手入力してください。'));
+console.log('PASS 4-zone overflow beyond a field\'s slot capacity is auto-filled up to capacity and named in BI166');
+
 // Unmatched zone-type name: must not guess a checkbox, and must not throw.
 const unmatched = planZoning([{ zone_label: null, fields: [{ code: 'zoning_type', value: '謎の地域', needs_review: false }] }]);
 assert.equal(Object.keys(unmatched).length, 0);

@@ -63,6 +63,12 @@ def zone_view(data):
         for z in zones]
 
 
+# 用途地域が3つ・稀に4つに跨る実例があるため、対応レターもここまで。契約書側の建ぺい率・容積率・
+# 高度地区など一部項目はシートの枠(3件/2件)を超えると自動反映できず、手入力の案内に切り替わる
+# （netlify/functions/generate.mjs の overflowNote 参照）。
+ZONE_LETTERS = ('A', 'B', 'C', 'D')
+
+
 def _latest_version(workspace, document_id):
     versions = workspace.rest(f'document_versions?document_id=eq.{document_id}&select=document_version_id,version_no,as_of_date,original_filename&order=version_no.desc&limit=1')
     if not versions:return None
@@ -98,7 +104,7 @@ def upload(workspace, cid, files):
     case = workspace.case(cid)
     building_id = case.get('building_id')
     if not building_id:raise StoreError('この案件は建物と紐付いていません。先に案件登録を完了してください。')
-    if not 1 <= len(files) <= 3:raise StoreError('用途地域資料は1〜3件選択してください。')
+    if not 1 <= len(files) <= len(ZONE_LETTERS):raise StoreError(f'用途地域資料は1〜{len(ZONE_LETTERS)}件選択してください。')
     parsed = []
     for filename, content in files:
         filename = filename.replace('\\', '/').rsplit('/', 1)[-1]
@@ -126,11 +132,11 @@ def upload(workspace, cid, files):
     if not new_zones:
         return {'state': workspace.public(), 'case_id': cid, 'reused': True}
     zones = existing_zones + new_zones
-    if len(zones) > 3:raise StoreError('用途地域資料は建物ごとに最大3件までです。')
-    used_letters = {z.get('zone_label') for z in existing_zones if z.get('zone_label') in ('A', 'B', 'C')}
+    if len(zones) > len(ZONE_LETTERS):raise StoreError(f'用途地域資料は建物ごとに最大{len(ZONE_LETTERS)}件までです。')
+    used_letters = {z.get('zone_label') for z in existing_zones if z.get('zone_label') in ZONE_LETTERS}
     for zone in new_zones:
-        if zone.get('zone_label') not in ('A', 'B', 'C'):
-            letter = next(l for l in ('A', 'B', 'C') if l not in used_letters)
+        if zone.get('zone_label') not in ZONE_LETTERS:
+            letter = next(l for l in ZONE_LETTERS if l not in used_letters)
             zone['zone_label'] = letter;used_letters.add(letter)
     version_no = (latest['version_no'] + 1) if latest else 1
     filenames = [z.get('source_filename') for z in zones if z.get('source_filename')]
