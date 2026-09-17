@@ -25,6 +25,7 @@ LABELS={
     'planned_road':'都市計画道路','other_restrictions':'その他の都市計画制限',
     'reference_date':'資料の基準日','municipality':'自治体名','target_address':'対象所在地',
     'special_use_district':'特別用途地区','minimum_lot_area':'敷地面積の最低限度',
+    'minimum_height_district':'最低限高度地区',
 }
 FIELD_CODES=list(LABELS)
 ZONE_FIELDS=[c for c in FIELD_CODES if c not in ('reference_date','municipality','target_address')]
@@ -88,8 +89,6 @@ def parse_line_format(text,page_no=1):
     for code,pattern in patterns.items():
         hits=[(line.strip(),m.group(1)) for line in raw_lines if (m:=re.search(pattern,line))]
         _single(fields,code,[(l,_clean(v)) for l,v in hits])
-    height=re.search(r'種別\s*[：:]\s*([^\s]+高度地区)',text)
-    if height:fields['height_district']={'value':height.group(1),'page_no':page_no,'source_text':_clean(height.group(0)),'needs_review':False}
     road=re.search(r'^都市計画道路\s*種別\s+(.+?)(?:\s{2,}|$)',text,re.M)
     if road:fields['planned_road']={'value':_clean(road.group(1)),'page_no':page_no,'source_text':_clean(road.group(0)),'needs_review':False}
     for pattern,fcode,scode in [(r'^防火地域[・／]準防火地域\s+(.+?)(?:\s{2,}|$)',None,None)]:
@@ -147,6 +146,7 @@ def parse_map_export_format(text,page_no=1):
         # unrelated "不燃化促進区域 -" pair from the info panel). Below is not reliably tied to
         # its own label here, so those fields are left for the certificate/table formats or a
         # human to fill in rather than risk a wrong value.
+    for code,item in extract_height_districts(text,page_no).items():fields.setdefault(code,item)
     return fields
 
 
@@ -167,8 +167,6 @@ def parse_table_format(lines_raw,page_no=1):
     for code,pattern in single:
         hits=[(m.group(0).strip(),m.group(1)) for m in re.finditer(pattern,text)]
         _single(fields,code,[(l,_clean(v)) for l,v in dict.fromkeys(hits)])
-    height=re.search(r'高度地区\s+最高限度\s+([^\s　]+)',text)
-    if height:fields['height_district']={'value':_clean(height.group(1)),'page_no':page_no,'source_text':height.group(0).strip(),'needs_review':False}
     fire=re.search(r'防火地域[・／]準防火地域\s+([^\s　]+)',text)
     if fire:
         value=_clean(fire.group(1));key='semi_fire_zone' if value.startswith('準防火') else 'fire_zone' if value.startswith('防火') else None
@@ -190,6 +188,43 @@ def is_map_export_format(text):
     return 'この図は' in text or '都市計画に関する証明ではありません' in text or 'wagmap' in text.lower()
 
 
+def _half_width_m(value):
+    return re.sub(r'[０-９]',lambda m:chr(ord(m.group())-0xFEE0),value).replace('ｍ','m')
+
+
+def format_height(type_name,max_limit):
+    """建築計画概要書/用途地域証明書の記載を、契約書の高度地区欄の書式へ変換する。
+    例：種類が「50m高度地区」（種別の指定なし）→ そのまま「50m」。
+        種別が「第二種高度地区」、最高限度17m → 「17m第二種」（最高限度＋種別の順）。"""
+    short=_half_width_m(re.sub(r'高度地区$','',_clean(type_name))) if type_name else ''
+    if re.fullmatch(r'\d+(?:\.\d+)?m',short,re.I):return short
+    if max_limit:
+        limit=_half_width_m(_clean(max_limit))
+        if not re.search(r'm$',limit,re.I):limit+='m'
+        return limit+short if short else limit
+    return short or None
+
+
+def extract_height_districts(text,page_no=1):
+    """指定された高度地区の種別・最高限度・最低限度を1か所で解釈する（コロン区切り・スペース区切りの
+    両方に対応、複数レイアウトで再利用）。最低限度の指定があれば「最低限高度地区」欄へ別に入れる。"""
+    fields={}
+    kind=re.search(r'種[別類]\s*[：:]?\s*([^\s　]+?高度地区)',text)
+    top=re.search(r'最高限度[高さ]*\s*[：:]?\s*([0-9０-９.]+\s*[mｍ](?:高度地区)?)',text)
+    bottom=re.search(r'最低限度[高さ]*\s*[：:]?\s*([0-9０-９.]+\s*[mｍ])',text)
+    top_value=top.group(1) if top else None
+    if top_value and '高度地区' in top_value:
+        formatted=format_height(top_value,None)
+    else:
+        formatted=format_height(kind.group(1) if kind else None,top_value)
+    if formatted:
+        source=' '.join(m.group(0) for m in (kind,top) if m)
+        fields['height_district']={'value':formatted,'page_no':page_no,'source_text':_clean(source),'needs_review':False}
+    if bottom:
+        fields['minimum_height_district']={'value':_half_width_m(_clean(bottom.group(1))),'page_no':page_no,'source_text':_clean(bottom.group(0)),'needs_review':False}
+    return fields
+
+
 def parse_text(text,page_no=1):
     """The map-export layout's legend column collides with both other formats' patterns
     (a bare legend word ends up looking like a label with a value from an unrelated row),
@@ -200,6 +235,7 @@ def parse_text(text,page_no=1):
     # 特別用途地区 文教地区 なし) that the plainer line format would mistake for the value.
     fields=parse_table_format(text.splitlines(),page_no)
     for code,item in parse_line_format(text,page_no).items():fields.setdefault(code,item)
+    for code,item in extract_height_districts(text,page_no).items():fields.setdefault(code,item)
     return fields
 
 

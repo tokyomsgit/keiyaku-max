@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { Failure, UUID, authenticate, db, reply } from '../lib/common.mjs';
+import * as ZMAP from '../lib/zoning_excel_map.mjs';
 
 const TEMPLATE = 'supabase/functions/keiyaku-api/contract-template.xlsm';
 
@@ -107,19 +108,126 @@ export function plan(unit, building, realCase) {
   return cells;
 }
 
-export async function fill(template, unit, building, realCase) {
-  const zip = await JSZip.loadAsync(template, { createFolders: false });
-  const workbook = await zip.file('xl/workbook.xml').async('string');
-  const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
-  const sheetMatch = workbook.match(/<sheet\b[^>]*name="基本入力"[^>]*r:id="([^"]+)"/);
+async function sheetPathFor(zip, workbook, rels, sheetName) {
+  const sheetMatch = workbook.match(new RegExp(`<sheet\\b[^>]*name="${sheetName}"[^>]*r:id="([^"]+)"`));
   if (!sheetMatch) throw new Error('TEMPLATE');
   const relMatch = rels.match(new RegExp(`<Relationship\\b[^>]*Id="${sheetMatch[1]}"[^>]*Target="([^"]+)"`));
   if (!relMatch) throw new Error('TEMPLATE');
-  const sheetPath = relMatch[1].startsWith('/') ? relMatch[1].slice(1) : `xl/${relMatch[1].replace(/^\.\//, '')}`;
-  let xml = await zip.file(sheetPath).async('string');
+  return relMatch[1].startsWith('/') ? relMatch[1].slice(1) : `xl/${relMatch[1].replace(/^\.\//, '')}`;
+}
+
+const ZONE_LETTERS = ['A', 'B', 'C'];
+const toHalfWidth = value => String(value ?? '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+const zoneKey = value => toHalfWidth(value).replace(/\s+/g, '');
+const NOT_APPLICABLE = new Set(['', 'なし', '該当なし', '無', '不明', '-', '－', 'ー'].map(zoneKey));
+const isApplicable = value => value != null && !NOT_APPLICABLE.has(zoneKey(value));
+const markerFor = letters => letters.map(l => `(${l})`).join('');
+
+function zoneValue(zone, code) {
+  const item = (zone.fields || []).find(f => f.code === code);
+  return item && !item.needs_review ? item.value : null;
+}
+
+// Collapses per-zone values into groups (equal values across zones share one write and a
+// combined "(A)(B)" marker; different values get their own write, each with a single letter).
+function groupZones(zones, code) {
+  const groups = [];
+  zones.forEach((zone, index) => {
+    const value = zoneValue(zone, code);
+    if (!isApplicable(value)) return;
+    const key = zoneKey(value);
+    const existing = groups.find(g => g.key === key);
+    if (existing) existing.letters.push(ZONE_LETTERS[index]);
+    else groups.push({ key, value, letters: [ZONE_LETTERS[index]] });
+  });
+  return groups;
+}
+
+// Mirrors the recorded convention from a real filled example (see zoning_excel_map.mjs):
+// check the matching box, and when there is more than one zone, write which zone(s) it
+// covers into the marker cell right after that item's label. Unmatched zone-type/district
+// names are left unfilled rather than guessed.
+function planZoningChecklist(put, zones, code, table, multi) {
+  for (const group of groupZones(zones, code)) {
+    const key = Object.keys(table).find(name => zoneKey(name) === group.key);
+    if (!key) continue;
+    const cell = table[key];
+    put(cell.box, '■');
+    if (multi) put(cell.marker, markerFor(group.letters));
+  }
+}
+
+function planHeightDistrict(put, zones, multi) {
+  const groups = groupZones(zones, 'height_district');
+  groups.slice(0, ZMAP.HEIGHT_DISTRICT_SLOTS.length).forEach((group, index) => {
+    const slot = ZMAP.HEIGHT_DISTRICT_SLOTS[index];
+    put(slot.box, '■'); put(slot.value, group.value);
+    if (multi) put(slot.marker, markerFor(group.letters));
+  });
+  const minGroups = groupZones(zones, 'minimum_height_district');
+  if (minGroups.length) {
+    put(ZMAP.MIN_HEIGHT_DISTRICT.box, '■'); put(ZMAP.MIN_HEIGHT_DISTRICT.value, minGroups[0].value);
+    if (multi) put(ZMAP.MIN_HEIGHT_DISTRICT.marker, markerFor(minGroups[0].letters));
+  }
+}
+
+function planRatio(put, zones, code, slots) {
+  groupZones(zones, code).slice(0, slots.length).forEach((group, index) => {
+    const [valueCell, markerCell] = slots[index];
+    const number = Number(String(group.value).replace(/[^\d.]/g, ''));
+    if (Number.isFinite(number)) put(valueCell, number);
+    if (zones.length > 1) put(markerCell, markerFor(group.letters));
+  });
+}
+
+function planMinLotArea(put, zones) {
+  const groups = groupZones(zones, 'minimum_lot_area');
+  if (!groups.length) return;
+  const number = Number(String(groups[0].value).replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(number)) return;
+  put(ZMAP.MIN_LOT_AREA.yes, '■'); put(ZMAP.MIN_LOT_AREA.no, '□'); put(ZMAP.MIN_LOT_AREA.value, number);
+}
+
+// Only touches the 重説 sheet's zoning section; everything else in the template is untouched.
+// zones is the same [{zone_label, needs_review, fields:[{code,value,needs_review}]}] shape the
+// case screen's zoning card reads (see web_zoning.zone_view / netlify/functions/zoning.mjs).
+export function planZoning(zones) {
+  const cells = {};
+  const put = (cell, value) => { cells[cell] = value; };
+  if (!Array.isArray(zones) || !zones.length) return cells;
+  const multi = zones.length > 1;
+  planZoningChecklist(put, zones, 'zoning_type', ZMAP.ZONING_TYPES, multi);
+  planZoningChecklist(put, zones, 'fire_zone', { '防火地域': ZMAP.DISTRICT_TYPES['防火地域'] }, multi);
+  planZoningChecklist(put, zones, 'semi_fire_zone', { '準防火地域': ZMAP.DISTRICT_TYPES['準防火地域'] }, multi);
+  planZoningChecklist(put, zones, 'special_use_district', { '特別用途地区': ZMAP.DISTRICT_TYPES['特別用途地区'] }, multi);
+  planZoningChecklist(put, zones, 'height_use_district', { '高度利用地区': ZMAP.DISTRICT_TYPES['高度利用地区'] }, multi);
+  planZoningChecklist(put, zones, 'district_plan', { '地区計画区域': ZMAP.DISTRICT_TYPES['地区計画区域'] }, multi);
+  planRatio(put, zones, 'building_coverage_ratio', ZMAP.RATIO_SLOTS.building_coverage_ratio);
+  planRatio(put, zones, 'floor_area_ratio', ZMAP.RATIO_SLOTS.floor_area_ratio);
+  planHeightDistrict(put, zones, multi);
+  planMinLotArea(put, zones);
+  // The template's own BI166 sentence needs the road side/distance a human determines from
+  // the site; multiple zones just means the boundary note applies and must be checked.
+  if (multi) put(ZMAP.BI166, '【要確認】用途地域が複数のため、本物件の道路との位置関係を確認し、この文言を修正してください。');
+  return cells;
+}
+
+export async function fill(template, unit, building, realCase, zones = []) {
+  const zip = await JSZip.loadAsync(template, { createFolders: false });
+  const workbook = await zip.file('xl/workbook.xml').async('string');
+  const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
   const written = [];
+  const sheetPath = await sheetPathFor(zip, workbook, rels, '基本入力');
+  let xml = await zip.file(sheetPath).async('string');
   for (const [coordinate, value] of Object.entries(plan(unit, building, realCase))) xml = patchCell(xml, coordinate, value, written);
   zip.file(sheetPath, xml, { createFolders: false });
+  const zoningCells = planZoning(zones);
+  if (Object.keys(zoningCells).length) {
+    const disclosurePath = await sheetPathFor(zip, workbook, rels, '重説');
+    let disclosureXml = await zip.file(disclosurePath).async('string');
+    for (const [coordinate, value] of Object.entries(zoningCells)) disclosureXml = patchCell(disclosureXml, coordinate, value, written);
+    zip.file(disclosurePath, disclosureXml, { createFolders: false });
+  }
   zip.file('xl/workbook.xml', workbook.replace(/<calcPr\b([^>]*)\/>/, (_m, attrs) => `<calcPr${attrs.replace(/\s+(fullCalcOnLoad|forceFullCalc|calcMode)="[^"]*"/g, '')} fullCalcOnLoad="1" forceFullCalc="1" calcMode="auto"/>`), { createFolders: false });
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
   return { bytes, written };
@@ -145,7 +253,16 @@ async function generate(caseId) {
   const open = ids.length ? await db(`value_diffs?document_id=in.(${ids.join(',')})&review_status=eq.unreviewed&select=diff_id`) : [];
   if (open.length) throw new Failure(409, `あと${open.length}件確認すると契約書を生成できます。`);
   if (!realCase) realCase = (await db(`cases?unit_id=eq.${unitId}&select=*&order=updated_at.desc&limit=1`))[0] || {};
-  return fill(templateBytes(), unit, building, realCase);
+  const zoningDocs = unit.building_id ? await db(`documents?document_type=eq.zoning&building_id=eq.${unit.building_id}&select=document_id`) : [];
+  let zones = [];
+  if (zoningDocs.length) {
+    const versions = await db(`document_versions?document_id=eq.${zoningDocs[0].document_id}&select=document_version_id&order=version_no.desc&limit=1`);
+    if (versions.length) {
+      const values = await db(`extracted_values?document_version_id=eq.${versions[0].document_version_id}&field_code=eq.zoning_info&select=value`);
+      if (values.length) zones = values[0].value || [];
+    }
+  }
+  return fill(templateBytes(), unit, building, realCase, zones);
 }
 
 export default async (request) => {
