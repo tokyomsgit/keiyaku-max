@@ -120,7 +120,7 @@ button:disabled {
   background: var(--color-primary);
   color: var(--color-on-primary);
   border-color: var(--color-primary);
-  box-shadow: 0 2px 0 #045847;
+  box-shadow: 0 2px 0 #3E7182;
 }
 
 select {
@@ -532,8 +532,8 @@ aside {
 /* PDF import area only: appearance follows the existing theme. */
 .pdf-drop { min-height: 190px; padding: var(--space-lg); margin-block: var(--space-md); border: 3px dashed var(--color-primary); background: var(--color-primary-soft); color: var(--color-heading); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-sm); cursor: pointer; text-align: center; }
 .pdf-drop strong { font-size: var(--font-size-section); color: var(--color-primary); }
-.pdf-drop:hover { background: #DCEFE9; }
-.pdf-drop.is-dragging, .pdf-drop:focus-visible { border-color: var(--color-primary); background: #DCEFE9; outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pdf-drop:hover { background: #D5E9EE; }
+.pdf-drop.is-dragging, .pdf-drop:focus-visible { border-color: var(--color-primary); background: #D5E9EE; outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .pdf-drop.is-disabled { cursor: not-allowed; }
 .pdf-notices { color: var(--color-text); border-left: 4px solid var(--color-warning); padding-block: var(--space-sm); }
 .new-case-form label { display: grid; gap: var(--space-sm); font-weight: var(--font-weight-700); }
