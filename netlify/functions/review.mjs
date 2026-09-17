@@ -69,8 +69,11 @@ async function bundle(unitId, buildingId) {
   }
   const result = [...groups.values()].filter(g => g.candidates.length);
   for (const group of result) {
+    // Selectable candidates are preferred for the 推奨 pick, but a newer candidate is still
+    // suggested over an equally-unconfirmed baseline when nothing here has full evidence yet.
     const dated = c => c.as_of_date || '';
-    const best = group.candidates.filter(c => c.selectable).sort((a, b) => dated(b).localeCompare(dated(a)))[0];
+    const ranked = [...group.candidates].sort((a, b) => (b.selectable - a.selectable) || dated(b).localeCompare(dated(a)));
+    const best = ranked[0];
     group.recommended_diff_id = best && dated(best) > dated(group.baseline) ? best.diff_id : null;
   }
   return result;
@@ -84,7 +87,7 @@ async function confirm(caseId, unitId, buildingId, selections) {
     const group = byField.get(String(selection.field_code || ''));
     if (!group) continue; // Already resolved or unknown; nothing to do.
     const chosenId = selection.diff_id ? String(selection.diff_id) : null;
-    if (chosenId && !group.candidates.some(c => c.diff_id === chosenId && c.selectable)) {
+    if (chosenId && !group.candidates.some(c => c.diff_id === chosenId)) {
       throw new Failure(409, `「${group.label}」の候補が変わりました。画面を再読込してください。`);
     }
     for (const candidate of group.candidates) {

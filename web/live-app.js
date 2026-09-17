@@ -107,17 +107,27 @@ function forgetJob(){clearTimeout(pollTimer);activeJob=null;try{sessionStorage.r
 async function createNew(){const button=document.querySelector('#save-new'),status=document.querySelector('#status');button.disabled=true;status.textContent='登録しています…';try{const body={building_name:document.querySelector('#building-name').value,unit_name:document.querySelector('#unit-name').value,registry_location:document.querySelector('#registry-location').value,house_number:document.querySelector('#house-number').value,display_address:document.querySelector('#display-address').value};const result=await (await request('create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();liveState=result.state;detail(result.case_id);}catch(error){status.textContent=error.message;button.disabled=false;}}
 
 const dateOnly=v=>v?String(v).slice(0,10):'基準日未設定';
+function displayReview(value){
+  if(value===null||value===undefined||value==='')return '未取得';
+  if(typeof value==='boolean')return value?'有':'無';
+  if(Array.isArray(value)){
+    if(!value.length)return '（該当なし）';
+    return value.map(displayReview).join('／');
+  }
+  if(typeof value==='object')return Object.values(value).filter(v=>v!==null&&v!==undefined&&v!=='').map(displayReview).join(' ');
+  return display(value);
+}
 function candidateCard(group,candidate,isBaseline){
   const id=`review-${esc(group.field_code)}`;
   const radioValue=isBaseline?'baseline':esc(candidate.diff_id);
   const recommended=!isBaseline&&group.recommended_diff_id===candidate.diff_id;
   const checked=recommended||(isBaseline&&!group.recommended_diff_id);
-  const disabled=!isBaseline&&!candidate.selectable;
   const evidence=candidate.source_text?`<details><summary>原文を見る</summary><p>${esc(candidate.source_text)}</p></details>`:'';
-  return `<label class="review-option${disabled?' is-disabled':''}"><input type="radio" name="${id}" value="${radioValue}" ${checked?'checked':''} ${disabled?'disabled':''}>
-    <span class="review-option-body"><strong>${esc(display(candidate.value))}</strong>${recommended?'<span class="pill">推奨</span>':''}
-    <small>${isBaseline?'現在の値':esc(candidate.filename||'資料名不明')}　基準日：${esc(dateOnly(candidate.as_of_date))}${candidate.page_no?`　${candidate.page_no}ページ`:''}</small>
-    ${disabled?'<small class="muted">根拠不十分のため選択できません（原本確認が必要）</small>':''}${evidence}</span></label>`;
+  const source=isBaseline?(candidate.filename?`現在の値（${esc(candidate.filename)}）`:'現在の値'):esc(candidate.filename||'資料名不明');
+  return `<label class="review-option"><input type="radio" name="${id}" value="${radioValue}" ${checked?'checked':''}>
+    <span class="review-option-body"><strong>${esc(displayReview(candidate.value))}</strong>${recommended?'<span class="pill">推奨</span>':''}
+    <small>${source}　基準日：${esc(dateOnly(candidate.as_of_date))}${candidate.page_no?`　${candidate.page_no}ページ`:''}</small>
+    ${evidence}</span></label>`;
 }
 function reviewCard(group){
   return `<div class="card review-group" data-field="${esc(group.field_code)}"><div class="review-heading"><div><h2>${esc(group.label)}</h2><p>使用する値を選んでください。</p></div><span class="review-remaining">要確認</span></div>

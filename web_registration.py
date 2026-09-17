@@ -90,7 +90,11 @@ def payload_from(data):
             v=iso_date(v)
             if v is None:review=True
         if v=={}:v=None
-        item={'field_code':code,'value':v,'confidence':node.get('confidence') if isinstance(node,dict) else None,
+        # Registry extraction has no numeric confidence score of its own; a field that already
+        # cleared validate_evidence() and isn't flagged uncertain has effectively full confidence.
+        confidence=node.get('confidence') if isinstance(node,dict) else None
+        if confidence is None and not review and src:confidence=1.0
+        item={'field_code':code,'value':v,'confidence':confidence,
             'source_text':'\n'.join(dict.fromkeys(s.get('text','') for s in src)),
             'page_no':src[0].get('page') if src else None,'needs_review':review,
             'provenance':{'path':path,'sources':src,'needs_review':review}}
@@ -106,7 +110,7 @@ def payload_from(data):
     if shares and len(set(shares))==1:
         for code,v in zip(('land_right_numerator','land_right_denominator'),shares[0]):
             u[code]=v;src=sources(node_at(data,'land_right.share')) or sources(data['lands'][0].get('right_share'))
-            fields.append({'field_code':code,'value':v,'confidence':None,'source_text':'\n'.join(s.get('text','') for s in src),
+            fields.append({'field_code':code,'value':v,'confidence':1.0 if src else None,'source_text':'\n'.join(s.get('text','') for s in src),
                 'page_no':src[0].get('page') if src else None,'needs_review':False,
                 'provenance':{'path':'land_right.share','sources':src,'needs_review':False}})
     hashes={d['file_hash'] for d in documents}

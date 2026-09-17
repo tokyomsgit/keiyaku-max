@@ -33,7 +33,9 @@ class RegistrationTests(unittest.TestCase):
             self.assertEqual(len(land['provenance']['sources']),8)
             self.assertEqual(land['page_no'],2)
             self.assertIn('試験所在',land['source_text'])
-        self.assertIsNone(p['fields'][0]['confidence'])
+        # Registry extraction has no native confidence score; a fully-sourced, non-review
+        # field is treated as fully confident so it can actually be adopted via web_review_diff.
+        self.assertEqual(p['fields'][0]['confidence'],1.0)
 
     def test_low_confidence_and_review_values_never_enter_master(self):
         for change in ({'needs_review':True},{'confidence':.5}):
