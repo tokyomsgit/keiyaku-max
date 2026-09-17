@@ -1,10 +1,13 @@
 """Local-first reader for municipal zoning/city-planning reference PDFs.
 
-Three text layouts are handled (regex only, no guessing across ambiguous matches):
+Four text layouts are handled (regex only, no guessing across ambiguous matches):
   - a one-item-per-line certificate (e.g. Itabashi-style 都市計画情報)
   - a two-column "項目/内容" table (e.g. Bunkyo-style 都市計画情報)
   - a wagmap.jp-style printed map ("北区の地図" and similar city GIS exports),
     where a legend column and a value panel interleave in the flattened text
+  - a sonicweb-asp.jp "i-map" search-result printout (e.g. せたがや i-map 都市計画情報
+    検索結果), a two-column 項目名称/内容 grid where the unit lives in the label
+    (e.g. "建ぺい率(％)") rather than attached to the value
 Multiple zones (対象地が複数の用途地域にまたがる場合) are only ever split when the
 source text itself has an explicit "区域Ａ/区域Ｂ"-style label; anything else that
 matches more than once is left null and flagged, matching the rest of this project.
@@ -150,6 +153,49 @@ def parse_map_export_format(text,page_no=1):
     return fields
 
 
+def is_certificate_table_format(text):
+    return 'sonicweb-asp' in text.lower() or '都市計画情報　検索結果' in text or '都市計画情報 検索結果' in text
+
+
+def parse_certificate_table_format(text,page_no=1):
+    """sonicweb-asp.jp系「i-map」都市計画情報 検索結果（例：せたがや i-map）: 項目名称/内容の
+    2列表で、単位は値でなくラベル側に付く（例："建ぺい率(％)"）。対象の各ラベルは常に左列に
+    出現するため、行頭一致＋2連続スペースで値を止める方式（Itabashi式と同様）で読む。
+    地区計画・都市計画道路など複数行に折り返す項目は行単位で対応が取れないため対象外。"""
+    raw_lines=[x for x in text.splitlines() if x.strip()]
+    fields={}
+    patterns={
+      'zoning_type':r'^\s*用途地域\s+(.+?)(?:\s{2,}|$)','special_use_district':r'^\s*特別用途地区\s+(.+?)(?:\s{2,}|$)',
+      'height_use_district':r'(?:^\s*|\s{2,})高度利用地区\s+(.+?)(?:\s{2,}|$)','shadow_restriction':r'^\s*日影規制\s+(.+?)(?:\s{2,}|$)',
+      'minimum_lot_area':r'^\s*敷地規模の最低限度\([^)]*\)\s+(.+?)(?:\s{2,}|$)',
+    }
+    for code,pattern in patterns.items():
+        hits=[(line.strip(),m.group(1)) for line in raw_lines if (m:=re.search(pattern,line))]
+        _single(fields,code,[(l,_clean(v)) for l,v in hits])
+    for code,pattern in [('building_coverage_ratio',r'^\s*建[ぺ蔽]い?率\([％%]\)\s+([0-9０-９]+)(?:\s{2,}|$)'),
+                          ('floor_area_ratio',r'^\s*容積率\([％%]\)\s+([0-9０-９]+)(?:\s{2,}|$)')]:
+        m=re.search(pattern,text,re.M)
+        if m:fields[code]={'value':_half_width_m(_clean(m.group(1)))+'%','page_no':page_no,'source_text':_clean(m.group(0)),'needs_review':False}
+    fire=re.search(r'^\s*防火指定\s+(.+?)(?:\s{2,}|$)',text,re.M)
+    if fire:
+        value=_clean(fire.group(1));key='semi_fire_zone' if value.startswith('準防火') else 'fire_zone' if value.startswith('防火') else None
+        if key:fields[key]={'value':value,'page_no':page_no,'source_text':_clean(fire.group(0)),'needs_review':False}
+    height=re.search(r'^\s*高度地区\s+(.+?)(?:\s{2,}|$)',text,re.M)
+    if height:
+        value=_clean(height.group(1))
+        if value not in ('なし','－','-'):
+            formatted=format_height(value,None)
+            if formatted:fields['height_district']={'value':formatted,'page_no':page_no,'source_text':_clean(height.group(0)),'needs_review':False}
+    minheight=re.search(r'^\s*最低限高度地区\([^)]*\)\s+(.+?)(?:\s{2,}|$)',text,re.M)
+    if minheight:
+        value=_clean(minheight.group(1))
+        if value not in ('なし','－','-'):
+            fields['minimum_height_district']={'value':_half_width_m(value),'page_no':page_no,'source_text':_clean(minheight.group(0)),'needs_review':False}
+    ref=re.search(r'([令和元\d]+年\d+月\d+日)時点のものです',text)
+    if ref and (d:=_wareki(ref.group(1))):fields['reference_date']={'value':d,'page_no':page_no,'source_text':_clean(ref.group(0)),'needs_review':False}
+    return fields
+
+
 def parse_table_format(lines_raw,page_no=1):
     """Two-column 項目/内容 table (Bunkyo-style 都市計画情報): a label and its value
     sit on the same physical line even though a second, unrelated 項目/内容 pair may
@@ -231,6 +277,8 @@ def parse_text(text,page_no=1):
     so it is parsed on its own rather than merged with the certificate/table passes."""
     if is_map_export_format(text):
         return parse_map_export_format(text,page_no)
+    if is_certificate_table_format(text):
+        return parse_certificate_table_format(text,page_no)
     # Table format runs first: its patterns skip known two-level sub-labels (e.g.
     # 特別用途地区 文教地区 なし) that the plainer line format would mistake for the value.
     fields=parse_table_format(text.splitlines(),page_no)

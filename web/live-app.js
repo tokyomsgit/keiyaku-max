@@ -131,9 +131,14 @@ function candidateCard(group,candidate,isBaseline){
 }
 function zoningCard(zoning){
   if(!zoning)return '';
-  const zoneBlock=(zone,index)=>`<div class="zoning-zone">${zone.zone_label||zoning.zones.length>1?`<h3>${esc(zone.zone_label||`区域${index+1}`)}</h3>`:''}
-    <dl class="facts">${zone.fields.map(f=>`<div><dt>${esc(f.label)}${f.needs_review?' <span class="pill warn">要確認</span>':''}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl></div>`;
-  return `<div class="card"><div class="review-heading"><div><h2>用途地域・都市計画</h2><p>${esc(zoning.filename)}${zoning.as_of_date?`　基準日：${esc(zoning.as_of_date)}`:''}</p></div>${zoning.reviewed?'<span class="review-complete">✓ 確認済み</span>':'<span class="review-remaining">要確認</span>'}</div>${zoning.zones.map(zoneBlock).join('')}${zoning.reviewed?'':'<p class="upload-warning">境界・指定内容を原本と照合してください。</p>'}</div>`;
+  const multi=zoning.zones.length>1;
+  const zoneBlock=(zone,index)=>{
+    const label=zone.zone_label||(multi?String.fromCharCode(65+index):null);
+    const moves=multi?`<span class="zoning-move">${index>0?`<button type="button" class="zoning-move-up" data-index="${index}" title="上へ">▲</button>`:''}${index<zoning.zones.length-1?`<button type="button" class="zoning-move-down" data-index="${index}" title="下へ">▼</button>`:''}</span>`:'';
+    const head=label||moves?`<div class="zoning-zone-head">${label?`<h3>${esc(label)}</h3>`:''}${zone.source_filename?`<span class="muted">${esc(zone.source_filename)}</span>`:''}${moves}</div>`:'';
+    return `<div class="zoning-zone">${head}<dl class="facts">${zone.fields.map(f=>`<div><dt>${esc(f.label)}${f.needs_review?' <span class="pill warn">要確認</span>':''}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl></div>`;
+  };
+  return `<div class="card"><div class="review-heading"><div><h2>用途地域・都市計画</h2><p>${esc(zoning.filename)}${zoning.as_of_date?`　基準日：${esc(zoning.as_of_date)}`:''}</p></div>${zoning.reviewed?'<span class="review-complete">✓ 確認済み</span>':'<span class="review-remaining">要確認</span>'}</div>${multi?'<p class="muted">契約書の(A)(B)はこの並び順で決まります。境界のどちら側か確認し、違う場合は▲▼で入れ替えてください。</p>':''}${zoning.zones.map(zoneBlock).join('')}${zoning.reviewed?'':'<p class="upload-warning">境界・指定内容を原本と照合してください。</p>'}<p id="zoning-status" role="status"></p></div>`;
 }
 function reviewCard(group){
   return `<div class="card review-group" data-field="${esc(group.field_code)}"><div class="review-heading"><div><h2>${esc(group.label)}</h2><p>使用する値を選んでください。</p></div><span class="review-remaining">要確認</span></div>
@@ -154,6 +159,22 @@ async function detail(id){
   document.querySelector('#generate').onclick=()=>generate(item);
   const confirmButton=document.querySelector('#confirm-reviews');
   if(confirmButton)confirmButton.onclick=()=>confirmReviews(item,groups);
+  if(zoning){
+    const moveZone=async(index,dir)=>{
+      const status=document.querySelector('#zoning-status');
+      const order=zoning.zones.map((_,i)=>i);
+      [order[index],order[index+dir]]=[order[index+dir],order[index]];
+      if(status)status.textContent='並び替えています…';
+      try{
+        const token=window.KeiyakuAuth?.token();if(!token)throw Error('ログインし直してください。');
+        const response=await fetch('/.netlify/functions/zoning?action=reorder',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({case_id:item.id,order})});
+        const result=await response.json();if(!response.ok)throw Error(result.error||'並び替えに失敗しました。');
+        detail(item.id);
+      }catch(error){if(status)status.textContent=error.message;}
+    };
+    root.querySelectorAll('.zoning-move-up').forEach(btn=>btn.onclick=()=>moveZone(Number(btn.dataset.index),-1));
+    root.querySelectorAll('.zoning-move-down').forEach(btn=>btn.onclick=()=>moveZone(Number(btn.dataset.index),1));
+  }
 }
 
 async function reviewApi(action,method,body,extraQuery=''){

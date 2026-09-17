@@ -580,6 +580,12 @@ aside {
 .purchase-field-evidence { display: flex; gap: var(--space-md); flex-wrap: wrap; }
 .purchase-field-evidence label { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--font-size-small); color: var(--color-text-muted); flex: 1; min-width: 160px; }
 
-/* Zoning/city-planning reference display (read-only for now, no batch review yet) */
+/* Zoning/city-planning reference display; multi-zone (用途境あり) lets the user fix the
+   (A)/(B)/(C) order since the Excel writer letters purely by array position. */
 .zoning-zone + .zoning-zone { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border); }
-.zoning-zone h3 { font-size: var(--font-size-16); margin-bottom: var(--space-xs); }
+.zoning-zone h3 { font-size: var(--font-size-16); margin-bottom: 0; }
+.zoning-zone-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+.zoning-zone-head .muted { font-size: var(--font-size-small); color: var(--color-text-muted); }
+.zoning-move { display: flex; gap: var(--space-xs); }
+.zoning-move button { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-sm); width: 28px; height: 28px; cursor: pointer; }
+.zoning-move button:hover { background: var(--color-primary-soft); border-color: var(--color-primary); }
