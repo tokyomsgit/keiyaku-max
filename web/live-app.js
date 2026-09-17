@@ -59,17 +59,55 @@ function forgetJob(){clearTimeout(pollTimer);activeJob=null;try{sessionStorage.r
 
 async function createNew(){const button=document.querySelector('#save-new'),status=document.querySelector('#status');button.disabled=true;status.textContent='登録しています…';try{const body={building_name:document.querySelector('#building-name').value,unit_name:document.querySelector('#unit-name').value,registry_location:document.querySelector('#registry-location').value,house_number:document.querySelector('#house-number').value,display_address:document.querySelector('#display-address').value};const result=await (await request('create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();liveState=result.state;detail(result.case_id);}catch(error){status.textContent=error.message;button.disabled=false;}}
 
-function detail(id){
+const dateOnly=v=>v?String(v).slice(0,10):'基準日未設定';
+function candidateCard(group,candidate,isBaseline){
+  const id=`review-${esc(group.field_code)}`;
+  const radioValue=isBaseline?'baseline':esc(candidate.diff_id);
+  const recommended=!isBaseline&&group.recommended_diff_id===candidate.diff_id;
+  const checked=recommended||(isBaseline&&!group.recommended_diff_id);
+  const disabled=!isBaseline&&!candidate.selectable;
+  const evidence=candidate.source_text?`<details><summary>原文を見る</summary><p>${esc(candidate.source_text)}</p></details>`:'';
+  return `<label class="review-option${disabled?' is-disabled':''}"><input type="radio" name="${id}" value="${radioValue}" ${checked?'checked':''} ${disabled?'disabled':''}>
+    <span class="review-option-body"><strong>${esc(display(candidate.value))}</strong>${recommended?'<span class="pill">推奨</span>':''}
+    <small>${isBaseline?'現在の値':esc(candidate.filename||'資料名不明')}　基準日：${esc(dateOnly(candidate.as_of_date))}${candidate.page_no?`　${candidate.page_no}ページ`:''}</small>
+    ${disabled?'<small class="muted">根拠不十分のため選択できません（原本確認が必要）</small>':''}${evidence}</span></label>`;
+}
+function reviewCard(group){
+  return `<div class="card review-group" data-field="${esc(group.field_code)}"><div class="review-heading"><div><h2>${esc(group.label)}</h2><p>使用する値を選んでください。</p></div><span class="review-remaining">要確認</span></div>
+    <div class="review-options">${candidateCard(group,group.baseline,true)}${group.candidates.map(c=>candidateCard(group,c,false)).join('')}</div></div>`;
+}
+async function detail(id){
   const item=liveState.cases.find(c=>c.id===id);if(!item)return list();
   const missing=item.fields.filter(f=>f.value===null||f.value===undefined||f.value==='').length;
-  root.innerHTML=`<nav class="steps"><a>① 資料</a><a class="${item.unresolved?'active':''}">② 要確認</a><a class="${item.unresolved?'':'active'}">③ 契約書生成</a></nav><p><button id="back">← 物件一覧へ</button> <button id="add-pdfs">PDFを追加</button></p>${item.reviews?.map(review=>`<div class="card"><div class="review-heading"><div><h2>${esc(review.label)}</h2><p>新旧どちらを使うか選んでください。</p></div><span class="review-remaining">要確認</span></div><div class="review-choices"><button data-decision="old" data-diff="${esc(review.diff_id)}"><span>現在の値を使う</span><strong>${esc(display(review.old_value))}</strong></button><button class="primary" data-decision="new" data-diff="${esc(review.diff_id)}"><span>新しい資料を使う</span><strong>${esc(display(review.new_value))}</strong></button></div></div>`).join('')||''}<div class="card"><div class="review-heading"><div><h2>${esc(item.building_name)} ${esc(item.unit_name)}</h2><p>Excelへ反映する主要情報</p></div>${item.unresolved?`<span class="review-remaining">あと${item.unresolved}件確認</span>`:'<span class="review-complete">✓ 差分確認済み</span>'}</div><dl class="facts">${item.fields.map(f=>`<div><dt>${esc(f.label)}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl>${missing?`<p class="muted">未取得：${missing}項目。未取得欄は空欄のまま生成します。</p>`:''}${item.unresolved?'<p class="upload-warning">確認が必要な差分を解消すると生成できます。</p>':'<p class="success">契約書を生成できます。</p>'}<div class="actions"><button id="generate" class="primary" ${item.unresolved?'disabled':''}>契約書Excelを生成</button></div><p id="status" role="status"></p></div>`;
+  let groups=[];
+  try{groups=(await reviewApi('list','GET',null,`&case_id=${encodeURIComponent(id)}`)).groups||[];}catch{}
+  root.innerHTML=`<nav class="steps"><a>① 資料</a><a class="${groups.length?'active':''}">② 要確認</a><a class="${groups.length?'':'active'}">③ 契約書生成</a></nav><p><button id="back">← 物件一覧へ</button> <button id="add-pdfs">PDFを追加</button></p>${groups.map(reviewCard).join('')}${groups.length?'<div class="card"><div class="actions"><button id="confirm-reviews" class="primary">選択した内容を確定</button></div><p id="review-status" role="status"></p></div>':''}<div class="card"><div class="review-heading"><div><h2>${esc(item.building_name)} ${esc(item.unit_name)}</h2><p>Excelへ反映する主要情報</p></div>${groups.length?`<span class="review-remaining">あと${groups.length}件確認</span>`:'<span class="review-complete">✓ 差分確認済み</span>'}</div><dl class="facts">${item.fields.map(f=>`<div><dt>${esc(f.label)}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl>${missing?`<p class="muted">未取得：${missing}項目。未取得欄は空欄のまま生成します。</p>`:''}${groups.length?'<p class="upload-warning">確認が必要な項目を解消すると生成できます。</p>':'<p class="success">契約書を生成できます。</p>'}<div class="actions"><button id="generate" class="primary" ${groups.length?'disabled':''}>契約書Excelを生成</button></div><p id="status" role="status"></p></div>`;
   document.querySelector('#back').onclick=list;
   document.querySelector('#add-pdfs').onclick=()=>createForm(item.id);
   document.querySelector('#generate').onclick=()=>generate(item);
-  root.querySelectorAll('[data-decision]').forEach(button=>button.onclick=()=>decide(item,button));
+  const confirmButton=document.querySelector('#confirm-reviews');
+  if(confirmButton)confirmButton.onclick=()=>confirmReviews(item,groups);
 }
 
-async function decide(item,button){button.disabled=true;try{liveState=await (await request('decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:item.id,diff_id:button.dataset.diff,choice:button.dataset.decision})})).json();detail(item.id);}catch(error){button.disabled=false;alert(error.message);}}
+async function reviewApi(action,method,body,extraQuery=''){
+  const token=window.KeiyakuAuth?.token();if(!token)throw Error('ログインし直してください。');
+  const response=await fetch(`/.netlify/functions/review?action=${action}${extraQuery}`,{method,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:body?JSON.stringify(body):undefined});
+  const result=await response.json();if(!response.ok)throw Error(result.error||'処理に失敗しました。');
+  return result;
+}
+
+async function confirmReviews(item,groups){
+  const button=document.querySelector('#confirm-reviews'),status=document.querySelector('#review-status');
+  button.disabled=true;status.textContent='確定しています…';
+  const selections=groups.map(group=>{
+    const chosen=document.querySelector(`input[name="review-${CSS.escape(group.field_code)}"]:checked`)?.value;
+    return {field_code:group.field_code,diff_id:chosen&&chosen!=='baseline'?chosen:null};
+  });
+  try{
+    await reviewApi('confirm','POST',{case_id:item.id,selections});
+    detail(item.id);
+  }catch(error){status.textContent=error.message;button.disabled=false;}
+}
 
 async function generate(item){
   const button=document.querySelector('#generate'),status=document.querySelector('#status');button.disabled=true;button.textContent='契約書作成中…';status.textContent='本番ひな形へ反映しています。';

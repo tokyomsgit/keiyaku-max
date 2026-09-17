@@ -553,3 +553,15 @@ aside {
 .candidate-list label span { display: flex; flex-direction: column; gap: var(--space-xs); }
 .candidate-list input { margin-top: 0.3em; width: 20px; height: 20px; }
 @media (max-width: 700px) { .kind-row { grid-template-columns: 1fr; } }
+
+/* Batch value-conflict review: one radio group per field, all confirmed at once */
+.review-options { display: flex; flex-direction: column; gap: var(--space-sm); }
+.review-option { display: flex; gap: var(--space-md); align-items: flex-start; padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; }
+.review-option:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.review-option.is-disabled { cursor: not-allowed; opacity: .6; }
+.review-option input { margin-top: 0.3em; width: 20px; height: 20px; flex-shrink: 0; }
+.review-option-body { display: flex; flex-direction: column; gap: var(--space-xs); }
+.review-option-body strong { font-size: var(--font-size-23); overflow-wrap: anywhere; }
+.review-option-body small { color: var(--color-text-muted); }
+.review-option-body details { font-size: var(--font-size-small); }
+.review-option-body details p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-muted); }

@@ -135,16 +135,15 @@ async function generate(caseId) {
     unitId = realCase?.unit_id;
   }
   if (!unitId) throw new Failure(404, '案件・住戸が見つかりません。');
-  const [units, documents] = await Promise.all([
-    db(`units?unit_id=eq.${unitId}&select=*&limit=1`),
-    db(`documents?unit_id=eq.${unitId}&select=document_id`),
-  ]);
-  const ids = documents.map(d => d.document_id);
-  const open = ids.length ? await db(`value_diffs?document_id=in.(${ids.join(',')})&review_status=eq.unreviewed&select=diff_id`) : [];
-  if (open.length) throw new Failure(409, `あと${open.length}件確認すると契約書を生成できます。`);
+  const units = await db(`units?unit_id=eq.${unitId}&select=*&limit=1`);
   const unit = units[0];
   if (!unit) throw new Failure(404, '案件・住戸が見つかりません。');
   const building = (await db(`buildings?building_id=eq.${unit.building_id}&select=*&limit=1`))[0] || {};
+  // Includes building-level management_rules documents (unit_id is null there), matching review.mjs.
+  const documents = await db(`documents?or=(unit_id.eq.${unitId},and(building_id.eq.${unit.building_id},document_type.eq.management_rules))&select=document_id`);
+  const ids = documents.map(d => d.document_id);
+  const open = ids.length ? await db(`value_diffs?document_id=in.(${ids.join(',')})&review_status=eq.unreviewed&select=diff_id`) : [];
+  if (open.length) throw new Failure(409, `あと${open.length}件確認すると契約書を生成できます。`);
   if (!realCase) realCase = (await db(`cases?unit_id=eq.${unitId}&select=*&order=updated_at.desc&limit=1`))[0] || {};
   return fill(templateBytes(), unit, building, realCase);
 }
