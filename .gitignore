@@ -19,3 +19,4 @@ verification*/
 *.zip
 *.log
 *_private.json
+node_modules/

@@ -74,10 +74,10 @@ async function decide(item,button){button.disabled=true;try{liveState=await (awa
 async function generate(item){
   const button=document.querySelector('#generate'),status=document.querySelector('#status');button.disabled=true;button.textContent='契約書作成中…';status.textContent='本番ひな形へ反映しています。';
   try{
-    const response=await request('generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:item.id})});
+    const token=window.KeiyakuAuth?.token();if(!token)throw Error('ログインし直してください。');const response=await fetch('/.netlify/functions/generate',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({case_id:item.id})});if(!response.ok){let data={};try{data=await response.json();}catch{}throw Error(data.error||'契約書を生成できませんでした。');}
     const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
     link.href=url;link.download=`契約書_${item.building_name}_${item.unit_name}.xlsm`;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.innerHTML='✓ 契約書を作成しました。ダウンロードしたExcelを原本と照合してください。';
+    status.textContent='✓ 契約書を作成しました。「要確認」と入った欄は原本で確認してください。もう一度押すと再ダウンロードできます。';button.disabled=false;
   }catch(error){status.textContent=error.message;button.disabled=false;}finally{button.textContent='契約書Excelを生成';}
 }
 

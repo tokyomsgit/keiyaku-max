@@ -1,46 +1,12 @@
 // Cloud PDF intake. Secrets stay in Netlify environment variables; PDFs go to a private bucket.
-const AUTH_URL = 'https://afdtohxuzuwlqmjbrpar.supabase.co';
-const AUTH_KEY = 'sb_publishable_4I1EXj6iMy3J-_nxBrOasw_1CRPXyw4';
+import { Failure, UUID, authenticate, config, db, reply } from '../lib/common.mjs';
+
 const BUCKET = 'keiyaku-private';
 const REPO = 'tokyomsgit/keiyaku-max';
 const WORKFLOW = 'cloud-ingest.yml';
 const HASH = /^[a-f0-9]{64}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const STALE_MS = 25 * 60 * 1000;
 const KINDS = ['purchase', 'registry', 'report', 'rules', 'skip'];
-
-class Failure extends Error {
-  constructor(status, message) { super(message); this.status = status; }
-}
-
-function reply(status, body) {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
-}
-
-function config() {
-  const url = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(url) || !key) throw new Failure(500, '初期設定が完了していません。管理者へ連絡してください。');
-  return { url, key };
-}
-
-async function authenticate(request) {
-  const authorization = request.headers.get('authorization') || '';
-  if (!authorization.startsWith('Bearer ')) throw new Failure(401, 'ログインし直してください。');
-  const response = await fetch(`${AUTH_URL}/auth/v1/user`, { headers: { apikey: AUTH_KEY, authorization } });
-  if (!response.ok) throw new Failure(401, 'ログインし直してください。');
-  const user = await response.json();
-  const allowed = (process.env.ALLOWED_EMAILS || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
-  if (allowed.length && !allowed.includes(String(user.email || '').toLowerCase())) throw new Failure(403, 'このアカウントは利用できません。');
-  return user;
-}
-
-async function db(path, options = {}) {
-  const { url, key } = config();
-  const response = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: key, authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(options.headers || {}) } });
-  if (!response.ok) throw new Failure(502, 'データベースに接続できませんでした。');
-  return response.status === 204 ? null : response.json();
-}
 
 async function storage(method, path, body, headers = {}) {
   const { url, key } = config();
