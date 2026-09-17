@@ -176,6 +176,11 @@ def read_files(job, files, output):
         if not re.fullmatch(UUID, case_id or ''):
             return {'status': 'failed', 'message': result.get('warning') or '案件登録を完了できませんでした。資料を確認してください。'}
         if result.get('warning'):warnings.append(result['warning'])
+    unsaved = [x for x in warnings if '未保存' in x]
+    if unsaved:
+        reason = unsaved[0].split('。 ', 1)[-1] if '。 ' in unsaved[0] else unsaved[0]
+        return {'status': 'failed', 'case_id': case_id, 'ai_calls': workspace.ai_calls,
+            'message': '案件は確認できましたが、追加した資料は保存していません。' + reason + ' 資料と物件が同じか原本で確認してください。'}
     return {'status': 'done', 'case_id': case_id, 'message': '読み取りが完了しました。', 'warnings': warnings,
         'ai_calls': workspace.ai_calls}
 
