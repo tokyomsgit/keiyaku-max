@@ -85,6 +85,49 @@ def batches(kinds, case_id):
     return [indexes]
 
 
+PURCHASE_TYPE_LABELS = {'condominium_land_right': '区分マンション（敷地権あり）', 'condominium_no_land_right': '区分マンション（敷地権なし）',
+    'leasehold_condominium': '借地マンション', 'detached_house': '戸建て（対象外）', 'unknown': '不明（対象外）'}
+
+
+def purchase_verification_needed(workspace, cid, job):
+    """Scanned purchase disclosures require the same manual check as the local app:
+    a human confirms property type and each field against the original before it can
+    be registered. Nothing here writes to the master DB; verify_fields only relabels
+    the staged local copy as reviewed."""
+    if not cid or not str(cid).startswith('upload-purchase-'):
+        return None
+    raw = workspace.raw.get(cid, {}).get('purchase')
+    if not raw or raw.get('property_type_verified'):
+        return None
+    source = raw.get('source', {})
+    if source.get('page_count', 0) <= source.get('text_pages', 0):
+        return None
+    entries = job.get('purchase_entries')
+    property_type = job.get('property_type')
+    if entries and property_type:
+        from web_purchase import verify_fields
+        from web_data import StoreError
+        try:
+            verify_fields(workspace, cid, entries, property_type)
+        except StoreError as exc:
+            return {'status': 'needs_purchase_verification', 'message': str(exc), **purchase_form(raw)}
+        return None
+    return {'status': 'needs_purchase_verification',
+        'message': '画像のページを含む資料のため、内容を原本と照合してから取り込んでください。', **purchase_form(raw)}
+
+
+def purchase_form(raw):
+    from purchase_explanation_reader import LABELS, NUMBER, KINDS
+    # Only fields the AI actually extracted are worth a human's time to verify;
+    # unobtained items stay null and are not shown here (nothing to check against the original).
+    fields = [{'code': code, 'label': LABELS.get(code, code), 'value': item.get('value'),
+        'page_no': item.get('page_no'), 'source_text': item.get('source_text'), 'confidence': item.get('confidence'),
+        'kind': 'number' if code in NUMBER else 'boolean' if code == 'has_land_right' else 'json' if code in ('land_lots', 'active_mortgages') else 'text'}
+        for code, item in raw.get('fields', {}).items() if item.get('value') is not None]
+    return {'fields': fields, 'page_count': raw.get('source', {}).get('page_count'),
+        'property_type_options': [{'value': k, 'label': PURCHASE_TYPE_LABELS.get(k, k)} for k in KINDS]}
+
+
 def candidate_view(match):
     items = []
     for c in match.get('candidates') or []:
@@ -155,7 +198,11 @@ def read_files(job, files, output):
     for group in batches([k for k in kinds if k], case_id):
         uploads = [selected[i] for i in group]
         authorize(workspace, plan['token'], uploads, True)
-        result = advance(workspace, upload_documents(workspace, case_id, uploads))
+        staged = upload_documents(workspace, case_id, uploads)
+        verification = purchase_verification_needed(workspace, staged.get('case_id'), job)
+        if verification:
+            return verification
+        result = advance(workspace, staged)
         preview = result.get('registration_preview')
         if preview:
             match = preview['match']

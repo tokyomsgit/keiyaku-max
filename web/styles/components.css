@@ -565,3 +565,13 @@ aside {
 .review-option-body small { color: var(--color-text-muted); }
 .review-option-body details { font-size: var(--font-size-small); }
 .review-option-body details p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-muted); }
+
+/* Scanned-purchase-disclosure verification form */
+.purchase-property-type { display: flex; flex-direction: column; gap: var(--space-xs); margin: var(--space-md) 0; max-width: 320px; }
+.purchase-fields { display: flex; flex-direction: column; gap: var(--space-md); }
+.purchase-field { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
+.purchase-field-check { display: flex; align-items: center; gap: var(--space-sm); }
+.purchase-field-check input { width: 20px; height: 20px; }
+.purchase-field input[data-value],.purchase-field textarea[data-value] { font-size: var(--font-size-18); font-weight: 700; }
+.purchase-field-evidence { display: flex; gap: var(--space-md); flex-wrap: wrap; }
+.purchase-field-evidence label { display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--font-size-small); color: var(--color-text-muted); flex: 1; min-width: 160px; }

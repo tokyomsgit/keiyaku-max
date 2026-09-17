@@ -41,6 +41,7 @@ if(busy)body=`<p class="job-progress" role="status">${esc(job.message||'読み�
 else if(job.status==='needs_kind')body=`<p class="upload-warning">${esc(job.message)}</p>${(job.unknown||[]).map(f=>`<label class="kind-row"><span>${esc(f.name)}</span><select data-kind="${esc(f.hash)}"><option value="">種類を選択</option>${Object.entries(KIND_LABELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>`).join('')}<div class="actions"><button id="job-kinds" class="primary">種類を確定して読み取る</button><button id="job-cancel">PDFを選び直す</button></div>`;
 else if(job.status==='needs_consent')body=`<p class="upload-warning">${esc(job.message)}</p><p>AI料金の概算：<strong>${job.estimate_jpy===null||job.estimate_jpy===undefined?'事前に計算できません':'約'+Number(job.estimate_jpy).toLocaleString('ja-JP')+'円'}</strong></p><div class="actions"><button id="job-consent" class="primary">AIで読み取る</button><button id="job-cancel">読み取らずに戻る</button></div>`;
 else if(job.status==='needs_candidate')body=`<p class="upload-warning">${esc(job.message)} 登記上の所在と家屋番号を確認して、対象の物件を選んでください。</p><fieldset class="candidate-list"><legend>物件候補</legend>${(job.candidates||[]).map(c=>`<label><input type="radio" name="candidate" value="${esc(c.id)}"><span><strong>${esc(c.building_name||'物件名未取得')} ${esc(c.unit_name||'')}</strong><small>家屋番号：${esc(display(c.house_number))}　所在：${esc(display(c.registry_location))}</small></span></label>`).join('')}</fieldset><div class="actions"><button id="job-candidate" class="primary">選択した物件で確定</button><button id="job-cancel">確定せずに戻る</button></div>`;
+else if(job.status==='needs_purchase_verification')body=purchaseVerificationBody(job);
 else if(job.status==='done')body=`<p class="success">✓ ${esc(job.message)}</p>`;
 else body=`<p class="upload-warning">${esc(job.message||'読み取りを完了できませんでした。')}</p><div class="actions"><button id="job-retry" class="primary">もう一度読み取る</button><button id="job-cancel">PDFを選び直す</button></div>`;
 root.innerHTML=`<nav class="steps"><a class="active">① 資料</a><a>② 要確認</a><a>③ 契約書生成</a></nav><div class="card"><h1>資料の読み取り</h1><ul class="job-files">${(job.files||[]).map(f=>`<li>${esc(f.name)}</li>`).join('')}</ul>${body}<p id="status" role="status"></p></div>`;
@@ -52,8 +53,54 @@ on('job-retry',button=>act({},button));
 on('job-consent',button=>act({ai_confirmed:true},button));
 on('job-kinds',button=>{const kinds={};for(const select of root.querySelectorAll('[data-kind]')){if(!select.value)return say('すべてのPDFの種類を選んでください。');kinds[select.dataset.kind]=select.value;}act({kinds},button);});
 on('job-candidate',button=>{const chosen=root.querySelector('input[name="candidate"]:checked');if(!chosen)return say('物件を1件選んでください。');act({candidate_id:chosen.value},button);});
+on('purchase-check-all',()=>{root.querySelectorAll('[data-verify]').forEach(box=>box.checked=true);});
+on('job-purchase-confirm',button=>{
+  const propertyType=document.querySelector('#purchase-property-type').value;
+  if(!propertyType)return say('物件種別を選んでください。');
+  const entries=[];
+  for(const row of root.querySelectorAll('.purchase-field')){
+    const code=row.dataset.field;
+    if(!row.querySelector('[data-verify]').checked)continue;
+    const valueInput=row.querySelector('[data-value]');
+    let value=valueInput.value;
+    if(row.dataset.kind==='number'){value=Number(value);if(!Number.isFinite(value))return say(`「${row.dataset.label}」は数値を入力してください。`);}
+    else if(row.dataset.kind==='boolean'){value=value==='true';}
+    else if(row.dataset.kind==='json'){try{value=JSON.parse(value);}catch{return say(`「${row.dataset.label}」の形式を確認してください。`);}}
+    const page=Number(row.querySelector('[data-page]').value);
+    const quote=row.querySelector('[data-quote]').value.trim();
+    if(!Number.isInteger(page)||page<1)return say(`「${row.dataset.label}」のページ番号を入力してください。`);
+    if(!quote)return say(`「${row.dataset.label}」の原文を入力してください。`);
+    entries.push({code,value,page_no:page,source_text:quote});
+  }
+  if(!entries.length)return say('原本で確認できた項目にチェックを入れてください。');
+  act({property_type:propertyType,purchase_entries:entries},button);
+});
 if(job.status==='done'){forgetJob();openCase(job.case_id,(job.warnings||[]).join(' ')).catch(error=>say(error.message));}
 if(busy)pollTimer=setTimeout(pollJob,8000);}
+
+function purchaseVerificationBody(job){
+  const rows=(job.fields||[]).map(f=>{
+    const val=f.kind==='json'?JSON.stringify(f.value):f.kind==='boolean'?String(f.value):f.value;
+    const input=f.kind==='boolean'
+      ?`<select data-value><option value="true" ${f.value?'selected':''}>有・該当</option><option value="false" ${f.value?'':'selected'}>無・非該当</option></select>`
+      :f.kind==='json'
+        ?`<textarea data-value rows="2">${esc(val)}</textarea>`
+        :f.kind==='number'
+          ?`<input type="number" step="any" data-value value="${esc(val)}">`
+          :`<input type="text" data-value value="${esc(val)}">`;
+    return `<div class="purchase-field" data-field="${esc(f.code)}" data-kind="${f.kind}" data-label="${esc(f.label)}">
+      <label class="purchase-field-check"><input type="checkbox" data-verify><strong>${esc(f.label)}</strong></label>
+      ${input}
+      <div class="purchase-field-evidence"><label>ページ<input type="number" min="1" max="${job.page_count||99}" data-page value="${f.page_no||1}"></label>
+      <label>原文<input type="text" data-quote value="${esc(f.source_text||'')}"></label></div>
+    </div>`;
+  }).join('');
+  return `<p class="upload-warning">${esc(job.message)}</p><p class="muted">原本（PDF）と見比べて、AIの読み取り結果が正しいか確認してください。違う場合は値を修正してからチェックを入れてください。未確認のままにした項目は保留になります。</p>
+    <label class="purchase-property-type">物件種別<select id="purchase-property-type"><option value="">選択してください</option>${(job.property_type_options||[]).map(o=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select></label>
+    <p><button type="button" id="purchase-check-all">すべて確認済みにする</button></p>
+    <div class="purchase-fields">${rows}</div>
+    <div class="actions"><button id="job-purchase-confirm" class="primary">確認した内容で取り込む</button><button id="job-cancel">PDFを選び直す</button></div>`;
+}
 async function pollJob(){if(!activeJob)return;try{showJob(await ingest('status'));}catch(error){const status=document.querySelector('#status');if(status)status.textContent=error.message+' 自動で再確認します。';pollTimer=setTimeout(pollJob,15000);}}
 function forgetJob(){clearTimeout(pollTimer);activeJob=null;try{sessionStorage.removeItem('keiyaku-max-job');}catch{}}
 

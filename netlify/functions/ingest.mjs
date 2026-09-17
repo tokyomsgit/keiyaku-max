@@ -7,6 +7,7 @@ const WORKFLOW = 'cloud-ingest.yml';
 const HASH = /^[a-f0-9]{64}$/;
 const STALE_MS = 25 * 60 * 1000;
 const KINDS = ['purchase', 'registry', 'report', 'rules', 'skip'];
+const PROPERTY_TYPES = ['condominium_land_right', 'condominium_no_land_right', 'leasehold_condominium', 'detached_house', 'unknown'];
 
 async function storage(method, path, body, headers = {}) {
   const { url, key } = config();
@@ -73,7 +74,7 @@ function publicJob(job) {
     status = 'failed'; message = '読取処理が時間内に終わりませんでした。もう一度お試しください。';
   }
   const view = { job_id: job.id, status, message, case_id: job.case_id || null, files: job.files.map(f => ({ name: f.name, hash: f.hash })) };
-  for (const key of ['candidates', 'unknown', 'estimate_jpy', 'ai_files', 'warnings']) if (job[key] !== undefined) view[key] = job[key];
+  for (const key of ['candidates', 'unknown', 'estimate_jpy', 'ai_files', 'warnings', 'fields', 'page_count', 'property_type_options']) if (job[key] !== undefined) view[key] = job[key];
   return view;
 }
 
@@ -138,6 +139,22 @@ async function run(body, user) {
       kinds[hash] = kind;
     }
     job.kinds = kinds;
+  }
+  if (body.purchase_entries !== undefined || body.property_type !== undefined) {
+    // The worker (verify_fields) re-validates every entry against the staged read; this only
+    // bounds size and shape so a malformed request fails fast instead of reaching Python.
+    if (!PROPERTY_TYPES.includes(body.property_type)) throw new Failure(400, '物件種別を選んでください。');
+    const known = new Set((job.fields || []).map(f => f.code));
+    const entries = Array.isArray(body.purchase_entries) ? body.purchase_entries : [];
+    if (!entries.length || entries.length > 80) throw new Failure(400, '確認した項目を選んでください。');
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object' || !known.has(entry.code) || !Number.isInteger(entry.page_no) || entry.page_no < 1
+        || typeof entry.source_text !== 'string' || !entry.source_text.trim() || entry.value === undefined) {
+        throw new Failure(400, '確認内容を確認してください。');
+      }
+    }
+    job.property_type = body.property_type;
+    job.purchase_entries = entries.map(e => ({ ...e, verified: true }));
   }
   Object.assign(job, { status: 'queued', message: '読取の順番を待っています。', updated_at: new Date().toISOString() });
   await writeJob(job);
