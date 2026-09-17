@@ -31,13 +31,15 @@ async function table(path: string) {
 }
 
 async function getState() {
-  const [units, buildings, cases, diffs] = await Promise.all([
+  const [units, buildings, cases, documents, diffs] = await Promise.all([
     table("units?select=*&order=updated_at.desc"),
     table("buildings?select=*&order=updated_at.desc"),
     table("cases?select=*&order=updated_at.desc"),
-    table("value_diffs?select=diff_id,field_code,review_status,unit_id&review_status=eq.unreviewed"),
+    table("documents?select=document_id,unit_id"),
+    table("value_diffs?select=diff_id,field_code,review_status,document_id&review_status=eq.unreviewed"),
   ]);
   const buildingById = new Map(buildings.map((item: any) => [item.building_id, item]));
+  const documentUnit = new Map(documents.map((item: any) => [item.document_id, item.unit_id]));
   const casesByUnit = new Map<string, any[]>();
   for (const item of cases) casesByUnit.set(item.unit_id, [...(casesByUnit.get(item.unit_id) || []), item]);
   return {
@@ -54,7 +56,7 @@ async function getState() {
         owner: unit.current_owner_name || "所有者未取得",
         area: unit.registered_area,
         updated_at: realCase?.updated_at || unit.updated_at,
-        unresolved: diffs.filter((item: any) => item.unit_id === unit.unit_id).length,
+        unresolved: diffs.filter((item: any) => documentUnit.get(item.document_id) === unit.unit_id).length,
         fields: [
           ["建物名", building.building_name], ["号室", unit.unit_name], ["登記所在", building.registry_location],
           ["家屋番号", unit.house_number], ["所有者", unit.current_owner_name], ["登記面積", unit.registered_area],
@@ -101,10 +103,12 @@ async function generate(caseId: string) {
     realCase = rows[0]; unitId = realCase?.unit_id;
   }
   if (!unitId) throw new Error("CASE");
-  const [units, diffs] = await Promise.all([
+  const [units, documents] = await Promise.all([
     table(`units?unit_id=eq.${encodeURIComponent(unitId)}&select=*&limit=1`),
-    table(`value_diffs?unit_id=eq.${encodeURIComponent(unitId)}&review_status=eq.unreviewed&select=diff_id`),
+    table(`documents?unit_id=eq.${encodeURIComponent(unitId)}&select=document_id`),
   ]);
+  const documentIds = documents.map((item: any) => item.document_id);
+  const diffs = documentIds.length ? await table(`value_diffs?document_id=in.(${documentIds.join(",")})&review_status=eq.unreviewed&select=diff_id`) : [];
   if (diffs.length) throw new Error("REVIEW");
   const unit = units[0];
   if (!unit) throw new Error("CASE");
