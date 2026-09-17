@@ -536,3 +536,5 @@ aside {
 .pdf-drop.is-dragging, .pdf-drop:focus-visible { border-color: var(--color-primary); background: #DCEFE9; outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .pdf-drop.is-disabled { cursor: not-allowed; }
 .pdf-notices { color: var(--color-text); border-left: 4px solid var(--color-warning); padding-block: var(--space-sm); }
+.new-case-form label { display: grid; gap: var(--space-sm); font-weight: var(--font-weight-700); }
+.new-case-form input { min-height: 44px; padding: var(--space-10); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm); font: inherit; background: var(--color-surface); }

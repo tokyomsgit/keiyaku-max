@@ -39,6 +39,34 @@ async function rpc(name: string, payload: unknown) {
   return response.status === 204 ? null : await response.json();
 }
 
+async function insert(name: string, payload: unknown) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("CONFIG");
+  const response = await fetch(`${url}/rest/v1/${name}`, { method: "POST", headers: { apikey: key, authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify(payload) });
+  if (!response.ok) throw new Error(`DB:${response.status}`);
+  return await response.json();
+}
+
+async function createCase(body: any) {
+  const buildingName = String(body.building_name || "").trim();
+  const unitName = String(body.unit_name || "").trim();
+  const registryLocation = String(body.registry_location || "").trim();
+  const houseNumber = String(body.house_number || "").trim();
+  if (!buildingName || !unitName || !registryLocation || !houseNumber) throw new Error("INPUT");
+  let building = (await table(`buildings?registry_location=eq.${encodeURIComponent(registryLocation)}&select=*&limit=2`));
+  if (building.length > 1) throw new Error("AMBIGUOUS");
+  if (!building.length) building = await insert("buildings", { building_name: buildingName, registry_location: registryLocation, display_address: String(body.display_address || "").trim() || null });
+  const buildingId = building[0].building_id;
+  let units = await table(`units?house_number=eq.${encodeURIComponent(houseNumber)}&select=*&limit=2`);
+  if (units.length && units[0].building_id !== buildingId) throw new Error("AMBIGUOUS");
+  if (!units.length) units = await insert("units", { building_id: buildingId, unit_name: unitName, house_number: houseNumber });
+  const unitId = units[0].unit_id;
+  let cases = await table(`cases?unit_id=eq.${encodeURIComponent(unitId)}&case_status=neq.completed&select=*&order=updated_at.desc&limit=1`);
+  if (!cases.length) cases = await insert("cases", { unit_id: unitId, case_status: "draft" });
+  return { state: await getState(), case_id: cases[0].case_id };
+}
+
 async function getState() {
   const [units, buildings, cases, documents, diffs, fields] = await Promise.all([
     table("units?select=*&order=updated_at.desc"),
@@ -174,6 +202,7 @@ Deno.serve(async (req: Request) => {
     await authenticate(req);
     const action = new URL(req.url).searchParams.get("action") || "state";
     if (req.method === "GET" && action === "state") return json(await getState());
+    if (req.method === "POST" && action === "create") return json(await createCase(await req.json()), 201);
     if (req.method === "POST" && action === "decision") {
       const body = await req.json();
       const caseId = String(body.case_id || "");
@@ -194,6 +223,8 @@ Deno.serve(async (req: Request) => {
     if (code === "AUTH") return json({ error: "ログインし直してください。" }, 401);
     if (code === "REVIEW") return json({ error: "未確認の差分があります。先に確認してください。" }, 409);
     if (code === "CASE") return json({ error: "案件・住戸が見つかりません。" }, 404);
+    if (code === "INPUT") return json({ error: "物件名・号室・登記所在・家屋番号を入力してください。" }, 400);
+    if (code === "AMBIGUOUS") return json({ error: "同じ識別情報の物件候補があります。既存案件から選択してください。" }, 409);
     console.error(code);
     return json({ error: "契約書を生成できませんでした。管理者へ連絡してください。" }, 500);
   }
