@@ -67,6 +67,24 @@ async function createCase(body: any) {
   return { state: await getState(), case_id: cases[0].case_id };
 }
 
+async function importCached(body: any) {
+  const files = Array.isArray(body.files) ? body.files.slice(0, 10) : [];
+  const hashes = files.map((item: any) => String(item.hash || "").toLowerCase()).filter((value: string) => /^[a-f0-9]{64}$/.test(value));
+  if (!hashes.length || hashes.length !== files.length) throw new Error("INPUT");
+  const versions = await table(`document_versions?file_hash=in.(${hashes.join(",")})&select=document_id,file_hash`);
+  const found = new Set(versions.map((item: any) => item.file_hash));
+  const missing = files.filter((item: any) => !found.has(String(item.hash).toLowerCase())).map((item: any) => item.name);
+  if (missing.length) return { cached: false, missing };
+  const documentIds = [...new Set(versions.map((item: any) => item.document_id))];
+  const documents = await table(`documents?document_id=in.(${documentIds.join(",")})&select=document_id,unit_id,building_id`);
+  const unitIds = [...new Set(documents.map((item: any) => item.unit_id).filter(Boolean))];
+  if (unitIds.length !== 1) throw new Error("AMBIGUOUS");
+  const unitId = unitIds[0];
+  let cases = await table(`cases?unit_id=eq.${encodeURIComponent(unitId)}&case_status=neq.completed&select=*&order=updated_at.desc&limit=1`);
+  if (!cases.length) cases = await insert("cases", { unit_id: unitId, case_status: "draft" });
+  return { cached: true, state: await getState(), case_id: cases[0].case_id };
+}
+
 async function getState() {
   const [units, buildings, cases, documents, diffs, fields] = await Promise.all([
     table("units?select=*&order=updated_at.desc"),
@@ -203,6 +221,7 @@ Deno.serve(async (req: Request) => {
     const action = new URL(req.url).searchParams.get("action") || "state";
     if (req.method === "GET" && action === "state") return json(await getState());
     if (req.method === "POST" && action === "create") return json(await createCase(await req.json()), 201);
+    if (req.method === "POST" && action === "import-cached") return json(await importCached(await req.json()));
     if (req.method === "POST" && action === "decision") {
       const body = await req.json();
       const caseId = String(body.case_id || "");
