@@ -45,8 +45,16 @@ class CostTests(unittest.TestCase):
  def test_token_file_binding(self):
   p=self.plan()
   with self.assertRaises(StoreError):authorize(self.w,p['token'],[('report','other.pdf',b'%PDF-other')],True)
- def test_regulations_scan_blocked(self):
-  self.file=('rules','rules.pdf',b'%PDF-synthetic');self.assertTrue(self.plan()['blocked'])
+ def test_regulations_scan_ocr_used_never_ai(self):
+  self.file=('rules','rules.pdf',b'%PDF-synthetic')
+  with patch('management_rules_reader.readable_text',side_effect=lambda pages,pdf:[dict(p,ocr_text='管理規約\n第1条　ペットの飼育を禁止する。') for p in pages]):
+   p=self.plan()
+  self.assertEqual(p['files'][0]['mode'],'local');self.assertEqual(p['ai_files'],0);self.assertFalse(p['blocked'])
+  h=hashlib.sha256(self.file[2]).hexdigest();d=json.loads((self.w.output/'rules_cache'/h/'extracted_normalized.json').read_text(encoding='utf8'))
+  self.assertIn('OCR',d['fields']['pet_restrictions']['source_section']);self.assertTrue(d['fields']['pet_restrictions']['needs_review'])
+ def test_regulations_unrecognizable_scan_raises(self):
+  self.file=('rules','rules.pdf',b'%PDF-synthetic')
+  with self.assertRaises(StoreError):self.plan()
  def test_ai_reader_mock_then_cache(self):
   from web_report import upload
   case={'id':'test','documents':[],'diffs':[]}

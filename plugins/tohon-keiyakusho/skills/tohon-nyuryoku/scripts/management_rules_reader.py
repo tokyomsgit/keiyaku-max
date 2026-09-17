@@ -24,29 +24,68 @@ KEYWORDS={'unit_use_restrictions':r'用途|住居として','office_use_allowed'
  'balcony_exclusive_use':r'バルコニー','private_garden_rules':r'専用庭','door_window_exclusive_use':r'玄関扉|窓枠|窓ガラス',
  'parking_rules':r'駐車場','renovation_restrictions':r'修繕等|模様替|改装|改造','leasing_restrictions':r'貸与|賃貸|賃借',
  'management_association_name':r'管理組合|組合の名称','voting_rights_rule':r'議決権','rules_effective_date':r'施行|施行日|効力',
- 'related_rules':r'使用細則|使用規則'}
+ 'related_rules':r'使用細則|使用規則','common_exclusive_use_rules':r'共用部分|共用施設',
+ 'bike_parking_info':r'駐輪場|自転車置場|バイク置場|原動機付自転車','management_type':r'管理の形態|全部委託|一部委託|自主管理',
+ 'management_staff_hours':r'管理員|管理人.{0,4}(勤務|業務)','prohibited_matters':r'禁止(する|事項|行為)',
+ 'approval_required_matters':r'届出|承認を得|承諾を得|許可を得'}
 
 
-def local_candidates(pages):
-    """Quotation candidates, not determinations of current rules. All require review."""
-    if not any(p['mode']=='text' and '管理規約' in p['text'] for p in pages):
-        raise StoreError('画像資料のためAPI利用制限中は読み取れません。時間を置いて再実行してください。')
+def readable_text(pages,pdf_path=None):
+    """Text-layer pages are used as-is; scan pages are OCR'd locally (once, cached on the page
+    dict) so keyword extraction can run against the whole document, not just its text pages.
+    Nothing here leaves this process. A missing tesseract install degrades to no OCR text
+    rather than failing the document, matching the poppler-optional pattern used elsewhere."""
+    scan_pages=[p for p in pages if p['mode']!='text' and 'ocr_text' not in p]
+    for page in pages:
+        if page['mode']=='text':page.setdefault('ocr_text',page['text'])
+    if not scan_pages or pdf_path is None:
+        for page in scan_pages:page['ocr_text']=''
+        return pages
+    try:
+        import pytesseract
+        import pypdfium2 as pdfium
+    except ImportError:
+        for page in scan_pages:page['ocr_text']=''
+        return pages
+    try:
+        with pdfium.PdfDocument(str(pdf_path)) as pdf:
+            for page in scan_pages:
+                try:
+                    bitmap=pdf[page['page_no']-1].render(scale=3)
+                    image=bitmap.to_pil()
+                    page['ocr_text']=pytesseract.image_to_string(image,lang='jpn')
+                except Exception:
+                    page['ocr_text']=''
+    except Exception:
+        for page in scan_pages:page.setdefault('ocr_text','')
+    return pages
+
+
+def local_candidates(pages,pdf_path=None):
+    """Quotation candidates, not determinations of current rules. All require review;
+    OCR-sourced quotes carry an extra review reason via normalize()'s scan-page check."""
+    pages=readable_text(pages,pdf_path)
+    if not any('管理規約' in (p.get('ocr_text') or '') or '使用細則' in (p.get('ocr_text') or '') for p in pages):
+        raise StoreError('管理規約・使用細則と確認できませんでした。資料を確認してください。')
     fields={}
     for code,pattern in KEYWORDS.items():
         hits=[]
         for page in pages:
-            if page['mode']!='text':continue
-            text=page['text'];articles=list(re.finditer(r'第\s*[0-9０-９一二三四五六七八九十百]+\s*条',text))
-            for i,m in enumerate(articles):
-                end=articles[i+1].start() if i+1<len(articles) else len(text)
-                block=text[m.start():end].strip()
-                if re.search(pattern,block):hits.append((page['page_no'],m.group(),block))
+            text=page.get('ocr_text') or ''
+            if not text:continue
+            articles=list(re.finditer(r'第\s*[0-9０-９一二三四五六七八九十百]+\s*条',text))
+            blocks=[(m.group(),text[m.start():(articles[i+1].start() if i+1<len(articles) else len(text))].strip())
+                for i,m in enumerate(articles)] or [(None,text)]
+            for article,block in blocks:
+                if re.search(pattern,block):hits.append((page['page_no'],article,block,page['mode']))
         # Multiple provisions may differ in scope: never choose the first as the effective value.
         hit=hits[0] if len(hits)==1 else None
+        method='OCR' if hit and hit[3]=='scan' else 'テキスト抽出' if hit else None
         fields[code]={'value':hit[2] if hit else None,'source_article':hit[1] if hit else None,
-            'source_section':'原文候補（API利用制限）','source_text':hit[2] if hit else None,'page_no':hit[0] if hit else None,
-            'confidence':None,'needs_review':True,'review_reasons':['API利用制限のため原本確認が必要'],
-            'candidates':[{'page_no':p,'source_article':a,'source_text':t} for p,a,t in hits]}
+            'source_section':f'原文候補（{method}・原本要確認）' if method else '原文候補（原本要確認）',
+            'source_text':hit[2] if hit else None,'page_no':hit[0] if hit else None,
+            'confidence':None,'needs_review':True,'review_reasons':['原本確認が必要'],
+            'candidates':[{'page_no':p,'source_article':a,'source_text':t} for p,a,t,_ in hits]}
     return {'is_management_rules':True,'building_name':None,'fields':fields,'local_candidates':True}
 
 

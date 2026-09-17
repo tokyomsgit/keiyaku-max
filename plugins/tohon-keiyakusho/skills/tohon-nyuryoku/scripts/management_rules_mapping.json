@@ -68,5 +68,35 @@
     "label": "関連する使用細則",
     "entity_level": "building",
     "excel_named_range": null
+  },
+  "common_exclusive_use_rules": {
+    "label": "共用部分の専用使用",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "bike_parking_info": {
+    "label": "自転車・バイク置場情報",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "management_type": {
+    "label": "管理形態",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "management_staff_hours": {
+    "label": "管理員勤務",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "prohibited_matters": {
+    "label": "禁止事項",
+    "entity_level": "building",
+    "excel_named_range": null
+  },
+  "approval_required_matters": {
+    "label": "届出・承認が必要な事項",
+    "entity_level": "building",
+    "excel_named_range": null
   }
 }

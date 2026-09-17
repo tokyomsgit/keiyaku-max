@@ -43,7 +43,7 @@ class RulesTests(unittest.TestCase):
 
     def test_evidence_text_scan_and_null_are_preserved(self):
         raw=sample();checked=normalize(raw,[{'mode':'text','text':'第12条 犬猫は禁止'}])
-        self.assertEqual(len(checked['fields']),14)
+        self.assertEqual(len(checked['fields']),len(MAPPING))
         self.assertFalse(checked['fields']['pet_restrictions']['needs_review'])
         self.assertEqual(checked['fields']['pet_restrictions']['source_article'],'第12条')
         self.assertTrue(checked['fields']['parking_rules']['needs_review'])

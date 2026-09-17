@@ -91,9 +91,7 @@ def local_result(w,kind,pdf,pages,digest):
         save(folder/'extracted.json',data);return
     if kind=='rules':
         from management_rules_reader import local_candidates
-        raw=local_candidates(pages)
-        for f in raw['fields'].values():
-            f['source_section']='ローカル抽出の条文候補';f['review_reasons']=['現在有効な条文・例外条件は原本確認が必要']
+        raw=local_candidates(pages,pdf)
     else:
         raw={'fields':{},'local_candidates':True}
         if kind=='report':raw.update(is_important_report=True,house_number=None)
@@ -148,16 +146,20 @@ def prepare(w,files,cid=None):
             recognizable=bool(re.search({'registry':'表題部|専有部分|権利部','report':'重要事項調査|管理費|修繕積立金','purchase':'重要事項説明','rules':'管理規約|使用細則'}[kind],text))
             # Cloud sets LOCAL_READ_KINDS: rule-only registry/purchase results cannot be registered.
             local_kinds=set((env('LOCAL_READ_KINDS') or ','.join(CACHE)).split(','))
-            if all(p['mode']=='text' for p in pages) and recognizable and kind in local_kinds:
+            if kind=='rules':
+                # Management rules text never leaves this process: scan pages are OCR'd locally
+                # (free) instead of being sent to the AI vision API, regardless of page mode.
+                local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・画像OCR併用（要確認）'
+            elif all(p['mode']=='text' for p in pages) and recognizable and kind in local_kinds:
                 local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・ローカル処理（要確認）'
             elif all(p['mode']=='text' for p in pages) and not recognizable:
                 raise StoreError('資料種類を確認できません。種類とPDF内容を確認してください。')
             else:mode='ai';note='AI解析が必要';cost=estimate(pages)
         items.append({'kind':kind,'hash':digest,'name':name.replace('\\','/').rsplit('/',1)[-1],'mode':mode,'status':note,'api_required':mode=='ai','estimate_jpy':cost,'pages':count})
     ai=[i for i in items if i['api_required']];total=None if any(i['estimate_jpy'] is None for i in ai) else sum(i['estimate_jpy'] for i in ai)
-    rules_scan=any(i['kind']=='rules' for i in ai)
-    blocked=bool((w.demo and ai) or rules_scan);warning='デモモードではAI解析できません。' if blocked else None
-    if rules_scan:warning='画像の管理規約は条文候補を絞れません。必要条文を確認できる資料を用意してください。全文をAIには送信しません。'
+    # Management rules never reach here as api_required (kind=='rules' is always local/OCR above),
+    # so this only ever gates registry/report/purchase AI reads.
+    blocked=bool(w.demo and ai);warning='デモモードではAI解析できません。' if blocked else None
     limit=env('AI_COST_LIMIT_JPY')
     if limit and ai:
         try:

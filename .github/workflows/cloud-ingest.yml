@@ -30,7 +30,7 @@ jobs:
           cache-dependency-path: requirements-cloud.txt
       - name: Install readers
         run: |
-          sudo apt-get install -y -qq poppler-utils > /dev/null
+          sudo apt-get install -y -qq poppler-utils tesseract-ocr tesseract-ocr-jpn > /dev/null
           python -m pip install -q -r requirements-cloud.txt
       - name: Read documents
         env:

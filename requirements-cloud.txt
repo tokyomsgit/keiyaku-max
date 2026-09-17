@@ -1,4 +1,5 @@
 pypdf>=5.0
+pytesseract>=0.3.10
 pypdfium2>=4.30
 openpyxl>=3.1
 pillow>=10.0
