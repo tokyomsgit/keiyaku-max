@@ -30,16 +30,27 @@ async function table(path: string) {
   return await response.json();
 }
 
+async function rpc(name: string, payload: unknown) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("CONFIG");
+  const response = await fetch(`${url}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: key, authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ p: payload }) });
+  if (!response.ok) throw new Error(`DB:${response.status}`);
+  return response.status === 204 ? null : await response.json();
+}
+
 async function getState() {
-  const [units, buildings, cases, documents, diffs] = await Promise.all([
+  const [units, buildings, cases, documents, diffs, fields] = await Promise.all([
     table("units?select=*&order=updated_at.desc"),
     table("buildings?select=*&order=updated_at.desc"),
     table("cases?select=*&order=updated_at.desc"),
     table("documents?select=document_id,unit_id"),
-    table("value_diffs?select=diff_id,field_code,review_status,document_id&review_status=eq.unreviewed"),
+    table("value_diffs?select=diff_id,field_code,old_value,new_value,review_status,document_id&review_status=eq.unreviewed"),
+    table("field_master?select=field_code,label_ja"),
   ]);
   const buildingById = new Map(buildings.map((item: any) => [item.building_id, item]));
   const documentUnit = new Map(documents.map((item: any) => [item.document_id, item.unit_id]));
+  const labels = new Map(fields.map((item: any) => [item.field_code, item.label_ja]));
   const casesByUnit = new Map<string, any[]>();
   for (const item of cases) casesByUnit.set(item.unit_id, [...(casesByUnit.get(item.unit_id) || []), item]);
   return {
@@ -47,6 +58,7 @@ async function getState() {
     cases: units.map((unit: any) => {
       const building: any = buildingById.get(unit.building_id) || {};
       const realCase = (casesByUnit.get(unit.unit_id) || [])[0];
+      const reviews = diffs.filter((item: any) => documentUnit.get(item.document_id) === unit.unit_id).map((item: any) => ({ ...item, label: labels.get(item.field_code) || item.field_code }));
       return {
         id: realCase?.case_id || `unit-${unit.unit_id}`,
         unit_id: unit.unit_id,
@@ -56,7 +68,8 @@ async function getState() {
         owner: unit.current_owner_name || "所有者未取得",
         area: unit.registered_area,
         updated_at: realCase?.updated_at || unit.updated_at,
-        unresolved: diffs.filter((item: any) => documentUnit.get(item.document_id) === unit.unit_id).length,
+        unresolved: reviews.length,
+        reviews,
         fields: [
           ["建物名", building.building_name], ["号室", unit.unit_name], ["登記所在", building.registry_location],
           ["家屋番号", unit.house_number], ["所有者", unit.current_owner_name], ["登記面積", unit.registered_area],
@@ -161,6 +174,15 @@ Deno.serve(async (req: Request) => {
     await authenticate(req);
     const action = new URL(req.url).searchParams.get("action") || "state";
     if (req.method === "GET" && action === "state") return json(await getState());
+    if (req.method === "POST" && action === "decision") {
+      const body = await req.json();
+      const caseId = String(body.case_id || "");
+      let unitId = caseId.startsWith("unit-") ? caseId.slice(5) : "";
+      if (!unitId) unitId = (await table(`cases?case_id=eq.${encodeURIComponent(caseId)}&select=unit_id&limit=1`))[0]?.unit_id;
+      if (!unitId || !["new", "old"].includes(body.choice)) throw new Error("CASE");
+      await rpc("web_review_diff", { diff_id: String(body.diff_id || ""), unit_id: unitId, action: body.choice === "new" ? "adopt" : "hold" });
+      return json(await getState());
+    }
     if (req.method === "POST" && action === "generate") {
       const body = await req.json();
       const bytes = await generate(String(body.case_id || ""));
