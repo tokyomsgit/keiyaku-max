@@ -15,7 +15,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-KINDS = ('purchase', 'registry', 'report', 'rules')
+KINDS = ('purchase', 'registry', 'report', 'rules', 'zoning')
 UUID = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CACHE_DIRS = ('registry_cache', 'report_cache', 'purchase_cache', 'rules_cache')
 
@@ -42,13 +42,14 @@ def classify(name, content):
     elif re.search(r'重要事項説明書', text):by_text = 'purchase'
     elif re.search(r'全部事項証明書|表題部|権利部[（(]甲区', text):by_text = 'registry'
     elif re.search(r'管理規約|使用細則', first) and re.search(r'第[1１一]条', text):by_text = 'rules'
-    elif re.search(r'用途地域|都市計画', first):by_text = 'other'
+    elif re.search(r'用途地域|都市計画情報', first) or 'この図は本区の都市計画に関する証明ではありません' in text or 'wagmap' in text.lower():by_text = 'zoning'
     by_name = None
-    if re.search(r'会社|商業|法人|委任状|依頼|申込|用途地域|長期修繕|図面|台帳', name):by_name = 'other'
+    if re.search(r'会社|商業|法人|委任状|依頼|申込|長期修繕|図面|台帳', name):by_name = 'other'
     elif re.search(r'重調|調査報告', name):by_name = 'report'
     elif re.search(r'重説|重要事項説明', name):by_name = 'purchase'
     elif re.search(r'謄本|登記|全部事項', name):by_name = 'registry'
     elif re.search(r'規約|細則', name):by_name = 'rules'
+    elif re.search(r'用途地域|都市計画', name):by_name = 'zoning'
     if by_text and by_name and by_text != by_name:
         return None
     kind = by_text or by_name

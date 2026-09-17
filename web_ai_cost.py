@@ -3,7 +3,7 @@ import copy,hashlib,json,math,re,secrets,time
 from pathlib import Path
 from web_data import ROOT,env,StoreError
 
-CACHE={'registry':'registry_cache','report':'report_cache','purchase':'purchase_cache','rules':'rules_cache'}
+CACHE={'registry':'registry_cache','report':'report_cache','purchase':'purchase_cache','rules':'rules_cache','zoning':'zoning_cache'}
 
 def save(path,data):
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -40,6 +40,9 @@ def cache_hit(w,kind,digest):
     if kind=='rules':
         from web_rules import cached
         if cached(digest,w.output) is not None:return True
+    if kind=='zoning':
+        from web_zoning import cached
+        return cached(digest,w.output) is not None
     # Recover original raw JSON without another AI request after normalization failures.
     bases=[w.output/CACHE[kind],ROOT.parent/({'report':'verification_important','purchase':'verification_purchase','rules':'verification_rules'}[kind])/'cache']
     configured=env({'report':'IMPORTANT_REPORT_CACHE_DIR','purchase':'PURCHASE_CACHE_DIR','rules':'MANAGEMENT_RULES_CACHE_DIR'}[kind])
@@ -89,6 +92,11 @@ def local_result(w,kind,pdf,pages,digest):
         mark(data)
         data['warnings'].append('テキストの既存ルール処理です。未取得・現在有効性は原本確認が必要です。')
         save(folder/'extracted.json',data);return
+    if kind=='zoning':
+        from zoning_reader import read_zoning
+        data=read_zoning(pdf)
+        data['source']['file_hash']=digest
+        save(folder/'extracted_normalized.json',data);return
     if kind=='rules':
         from management_rules_reader import local_candidates
         raw=local_candidates(pages,pdf)
@@ -143,10 +151,18 @@ def prepare(w,files,cid=None):
             except Exception:raise StoreError('対応していないPDF：破損・パスワードを確認してください。') from None
             if not pages:raise StoreError('ページがないPDFです。')
             count=len(pages);text=re.sub(r'\s+','',''.join(p['text'] for p in pages))
-            recognizable=bool(re.search({'registry':'表題部|専有部分|権利部','report':'重要事項調査|管理費|修繕積立金','purchase':'重要事項説明','rules':'管理規約|使用細則'}[kind],text))
+            recognizable=bool(re.search({'registry':'表題部|専有部分|権利部','report':'重要事項調査|管理費|修繕積立金','purchase':'重要事項説明','rules':'管理規約|使用細則','zoning':'用途地域|都市計画'}[kind],text))
             # Cloud sets LOCAL_READ_KINDS: rule-only registry/purchase results cannot be registered.
             local_kinds=set((env('LOCAL_READ_KINDS') or ','.join(CACHE)).split(','))
-            if kind=='rules':
+            if kind=='zoning':
+                # Text-layer certificates/tables are read for free and, when their three
+                # required fields are all found, are already confident (needs_review=False
+                # per field). Only a page with no usable text costs an AI-vision call.
+                local_result(w,kind,pdf,pages,digest)
+                saved=json.loads((w.output/CACHE[kind]/digest/'extracted_normalized.json').read_text(encoding='utf8'))
+                if saved['status']=='needs_ai':mode='ai';note='AI画像解析が必要';cost=estimate(pages)
+                else:mode='local';note='テキスト抽出（要確認）' if saved['status']=='needs_review' else 'テキスト抽出・確認済み'
+            elif kind=='rules':
                 # Management rules text never leaves this process: scan pages are OCR'd locally
                 # (free) instead of being sent to the AI vision API, regardless of page mode.
                 local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・画像OCR併用（要確認）'

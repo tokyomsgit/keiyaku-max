@@ -31,7 +31,7 @@ function selectPdfs(files){const existing=new Set(newPdfs.map(pdfKey));for(const
 function removePdf(index){newPdfs.splice(index,1);renderPdfList();}
 async function sha256(file){const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');}
 const INGEST='/.netlify/functions/ingest';
-const KIND_LABELS={purchase:'購入時重要事項説明書',registry:'登記簿謄本（建物・土地）',report:'重要事項調査報告書',rules:'管理規約・使用細則',skip:'この資料は読み取らない'};
+const KIND_LABELS={purchase:'購入時重要事項説明書',registry:'登記簿謄本（建物・土地）',report:'重要事項調査報告書',rules:'管理規約・使用細則',zoning:'用途地域資料',skip:'この資料は読み取らない'};
 let activeJob=null,pollTimer=null;
 async function ingest(action,body){const token=window.KeiyakuAuth?.token();if(!token)throw Error('ログインし直してください。');const url=`${INGEST}?action=${action}`+(body?'':`&job_id=${encodeURIComponent(activeJob)}`);const response=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(body)}:{headers:{Authorization:`Bearer ${token}`}});let data={};try{data=await response.json();}catch{}if(!response.ok)throw Error(data.error||'処理に失敗しました。');return data;}
 async function openCase(caseId,note=''){liveState=await (await request('state')).json();if(liveState.cases.some(c=>c.id===caseId))detail(caseId);else list();const status=document.querySelector('#status');if(note&&status)status.textContent=note;}
@@ -129,6 +129,12 @@ function candidateCard(group,candidate,isBaseline){
     <small>${source}　基準日：${esc(dateOnly(candidate.as_of_date))}${candidate.page_no?`　${candidate.page_no}ページ`:''}</small>
     ${evidence}</span></label>`;
 }
+function zoningCard(zoning){
+  if(!zoning)return '';
+  const zoneBlock=(zone,index)=>`<div class="zoning-zone">${zone.zone_label||zoning.zones.length>1?`<h3>${esc(zone.zone_label||`区域${index+1}`)}</h3>`:''}
+    <dl class="facts">${zone.fields.map(f=>`<div><dt>${esc(f.label)}${f.needs_review?' <span class="pill warn">要確認</span>':''}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl></div>`;
+  return `<div class="card"><div class="review-heading"><div><h2>用途地域・都市計画</h2><p>${esc(zoning.filename)}${zoning.as_of_date?`　基準日：${esc(zoning.as_of_date)}`:''}</p></div>${zoning.reviewed?'<span class="review-complete">✓ 確認済み</span>':'<span class="review-remaining">要確認</span>'}</div>${zoning.zones.map(zoneBlock).join('')}${zoning.reviewed?'':'<p class="upload-warning">境界・指定内容を原本と照合してください。</p>'}</div>`;
+}
 function reviewCard(group){
   return `<div class="card review-group" data-field="${esc(group.field_code)}"><div class="review-heading"><div><h2>${esc(group.label)}</h2><p>使用する値を選んでください。</p></div><span class="review-remaining">要確認</span></div>
     <div class="review-options">${candidateCard(group,group.baseline,true)}${group.candidates.map(c=>candidateCard(group,c,false)).join('')}</div></div>`;
@@ -136,9 +142,13 @@ function reviewCard(group){
 async function detail(id){
   const item=liveState.cases.find(c=>c.id===id);if(!item)return list();
   const missing=item.fields.filter(f=>f.value===null||f.value===undefined||f.value==='').length;
-  let groups=[];
+  let groups=[],zoning=null;
   try{groups=(await reviewApi('list','GET',null,`&case_id=${encodeURIComponent(id)}`)).groups||[];}catch{}
-  root.innerHTML=`<nav class="steps"><a>① 資料</a><a class="${groups.length?'active':''}">② 要確認</a><a class="${groups.length?'':'active'}">③ 契約書生成</a></nav><p><button id="back">← 物件一覧へ</button> <button id="add-pdfs">PDFを追加</button></p>${groups.map(reviewCard).join('')}${groups.length?'<div class="card"><div class="actions"><button id="confirm-reviews" class="primary">選択した内容を確定</button></div><p id="review-status" role="status"></p></div>':''}<div class="card"><div class="review-heading"><div><h2>${esc(item.building_name)} ${esc(item.unit_name)}</h2><p>Excelへ反映する主要情報</p></div>${groups.length?`<span class="review-remaining">あと${groups.length}件確認</span>`:'<span class="review-complete">✓ 差分確認済み</span>'}</div><dl class="facts">${item.fields.map(f=>`<div><dt>${esc(f.label)}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl>${missing?`<p class="muted">未取得：${missing}項目。未取得欄は空欄のまま生成します。</p>`:''}${groups.length?'<p class="upload-warning">確認が必要な項目を解消すると生成できます。</p>':'<p class="success">契約書を生成できます。</p>'}<div class="actions"><button id="generate" class="primary" ${groups.length?'disabled':''}>契約書Excelを生成</button></div><p id="status" role="status"></p></div>`;
+  try{
+    const token=window.KeiyakuAuth?.token();
+    if(token){const r=await fetch(`/.netlify/functions/zoning?action=get&case_id=${encodeURIComponent(id)}`,{headers:{Authorization:`Bearer ${token}`}});if(r.ok)zoning=(await r.json()).zoning;}
+  }catch{}
+  root.innerHTML=`<nav class="steps"><a>① 資料</a><a class="${groups.length?'active':''}">② 要確認</a><a class="${groups.length?'':'active'}">③ 契約書生成</a></nav><p><button id="back">← 物件一覧へ</button> <button id="add-pdfs">PDFを追加</button></p>${groups.map(reviewCard).join('')}${groups.length?'<div class="card"><div class="actions"><button id="confirm-reviews" class="primary">選択した内容を確定</button></div><p id="review-status" role="status"></p></div>':''}${zoningCard(zoning)}<div class="card"><div class="review-heading"><div><h2>${esc(item.building_name)} ${esc(item.unit_name)}</h2><p>Excelへ反映する主要情報</p></div>${groups.length?`<span class="review-remaining">あと${groups.length}件確認</span>`:'<span class="review-complete">✓ 差分確認済み</span>'}</div><dl class="facts">${item.fields.map(f=>`<div><dt>${esc(f.label)}</dt><dd>${esc(display(f.value))}</dd></div>`).join('')}</dl>${missing?`<p class="muted">未取得：${missing}項目。未取得欄は空欄のまま生成します。</p>`:''}${groups.length?'<p class="upload-warning">確認が必要な項目を解消すると生成できます。</p>':'<p class="success">契約書を生成できます。</p>'}<div class="actions"><button id="generate" class="primary" ${groups.length?'disabled':''}>契約書Excelを生成</button></div><p id="status" role="status"></p></div>`;
   document.querySelector('#back').onclick=list;
   document.querySelector('#add-pdfs').onclick=()=>createForm(item.id);
   document.querySelector('#generate').onclick=()=>generate(item);

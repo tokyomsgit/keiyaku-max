@@ -6,7 +6,7 @@ const REPO = 'tokyomsgit/keiyaku-max';
 const WORKFLOW = 'cloud-ingest.yml';
 const HASH = /^[a-f0-9]{64}$/;
 const STALE_MS = 25 * 60 * 1000;
-const KINDS = ['purchase', 'registry', 'report', 'rules', 'skip'];
+const KINDS = ['purchase', 'registry', 'report', 'rules', 'zoning', 'skip'];
 const PROPERTY_TYPES = ['condominium_land_right', 'condominium_no_land_right', 'leasehold_condominium', 'detached_house', 'unknown'];
 
 async function storage(method, path, body, headers = {}) {

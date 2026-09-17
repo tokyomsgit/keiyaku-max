@@ -19,7 +19,7 @@ class CloudWorkerTest(unittest.TestCase):
         self.assertEqual(w.classify('重調 704.pdf', blank), 'report')
         self.assertIsNone(w.classify('会社謄本.pdf', blank))
         self.assertIsNone(w.classify('重調発行に関する委任状.pdf', blank))
-        self.assertIsNone(w.classify('用途地域.pdf', blank))
+        self.assertEqual(w.classify('用途地域.pdf', blank), 'zoning')
         self.assertIsNone(w.classify('scan001.pdf', blank))
 
     def test_cache_round_trip_rejects_foreign_paths(self):

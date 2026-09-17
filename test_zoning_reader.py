@@ -18,7 +18,7 @@ class ZoningReaderTest(unittest.TestCase):
         self.assertEqual(fields['zoning_type']['value'],'第１種住居地域')
         self.assertEqual(fields['building_coverage_ratio']['value'],'60%')
         self.assertEqual(fields['floor_area_ratio']['value'],'200%')
-        self.assertEqual(fields['printed_at']['value'],'2025-12-08')
+        self.assertEqual(fields['reference_date']['value'],'2025-12-08')
 
     def test_ambiguous_values_are_not_invented(self):
         fields=parse_text('用途地域 第１種住居地域\n用途地域 商業地域')

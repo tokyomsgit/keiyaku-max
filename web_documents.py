@@ -36,6 +36,7 @@ def flush(w,source_id,cid):
                 pdf=Path(f['path']);content=pdf.read_bytes()
                 if hashlib.sha256(content).hexdigest()!=f['hash']:raise StoreError('保存済みPDFが変更されています。再選択してください。')
                 if f['kind']=='rules':from web_rules import upload
+                elif f['kind']=='zoning':from web_zoning import upload
                 else:from web_report import upload
                 upload(w,cid,[(f['name'],content)]);f['saved']=True;save_queue(path,r)
             except (StoreError,OSError,ValueError) as e:
@@ -45,7 +46,7 @@ def flush(w,source_id,cid):
 
 
 def upload(w,cid,files):
-    if not 1<=len(files)<=12 or any(k not in ('registry','report','rules','purchase') for k,_,_ in files):raise StoreError('各PDFの資料種類を選択してください。')
+    if not 1<=len(files)<=12 or any(k not in ('registry','report','rules','purchase','zoning') for k,_,_ in files):raise StoreError('各PDFの資料種類を選択してください。')
     if len({hashlib.sha256(v).hexdigest() for _,_,v in files})!=len(files):raise StoreError('同じPDFが複数選択されています。1件にしてください。')
     for _,name,content in files:
         if not name.lower().endswith('.pdf') or not content.startswith(b'%PDF-'):raise StoreError('PDFを選択してください。')
@@ -74,7 +75,7 @@ def upload(w,cid,files):
     for kind,name,content in files:
         if kind in ('registry','purchase'):continue
         name=name.replace('\\','/').rsplit('/',1)[-1];digest=hashlib.sha256(content).hexdigest()
-        folder=w.output/('rules_cache' if kind=='rules' else 'report_cache')/digest;folder.mkdir(parents=True,exist_ok=True)
+        folder=w.output/{'rules':'rules_cache','zoning':'zoning_cache'}.get(kind,'report_cache')/digest;folder.mkdir(parents=True,exist_ok=True)
         pdf=folder/'source.pdf';pdf.write_bytes(content)
         if not any(f['hash']==digest for f in record['files']):record['files'].append({'kind':kind,'name':name,'path':str(pdf.resolve()),'hash':digest,'saved':False})
     save_queue(path,record)

@@ -100,6 +100,24 @@ class Workspace:
             with urllib.request.build_opener(NoRedirect()).open(req,timeout=60) as r:return json.load(r)
         except (OSError,ValueError):raise StoreError('DB操作を完了できませんでした。再読込して差分・根拠を確認してください。') from None
 
+    def rest(self,path,payload=None,method='GET',write=False):
+        """Plain PostgREST call (unlike rpc(), the payload is sent as-is, not wrapped in {'p':...})."""
+        url,key=env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY')
+        import re
+        if not url or not key or not re.fullmatch(r'https://[a-z0-9]+\.supabase\.co/?',url):
+            raise StoreError('Supabaseの接続設定を確認してください。')
+        headers={'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'}
+        if method=='POST':headers['Prefer']='return=representation'
+        req=urllib.request.Request(url.rstrip('/')+'/rest/v1/'+path,
+            data=canonical(payload).encode('utf8') if payload is not None else None,method=method,headers=headers)
+        if write:self.writes+=1
+        else:self.reads+=1
+        try:
+            with urllib.request.build_opener(NoRedirect()).open(req,timeout=60) as r:
+                body=r.read()
+                return json.loads(body) if body else None
+        except (OSError,ValueError):raise StoreError('DB操作を完了できませんでした。再読込してください。') from None
+
     def load_demo(self):
         registry=env('DEMO_REGISTRY_JSON') or ROOT.parent/'verification_names/integrated_claude_private.json'
         report=env('DEMO_REPORT_JSON')
@@ -195,6 +213,8 @@ class Workspace:
             else:self.raw[c['id']]={'registry':registry,'unit':unit,'building':b,'report_fields':report_fields}
             from web_purchase import apply_snapshot
             apply_snapshot(self,c,case,s)
+            from web_zoning import attach_snapshot
+            attach_snapshot(self,c,unit['building_id'])
         for d in docs.values():
             if not d.get('unit_id') and not (d['document_type']=='management_rules' and d.get('building_id')):self.unmatched.append({'type':d['document_type'],'title':d.get('title') or '住戸未照合の資料'})
         from web_registry import restore
