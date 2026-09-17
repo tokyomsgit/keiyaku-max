@@ -144,11 +144,13 @@ def prepare(w,files,cid=None):
             try:pages=pdf_pages(pdf)
             except Exception:raise StoreError('対応していないPDF：破損・パスワードを確認してください。') from None
             if not pages:raise StoreError('ページがないPDFです。')
-            count=len(pages);text='\n'.join(p['text'] for p in pages)
+            count=len(pages);text=re.sub(r'\s+','',''.join(p['text'] for p in pages))
             recognizable=bool(re.search({'registry':'表題部|専有部分|権利部','report':'重要事項調査|管理費|修繕積立金','purchase':'重要事項説明','rules':'管理規約|使用細則'}[kind],text))
-            if all(p['mode']=='text' for p in pages) and recognizable:
+            # Cloud sets LOCAL_READ_KINDS: rule-only registry/purchase results cannot be registered.
+            local_kinds=set((env('LOCAL_READ_KINDS') or ','.join(CACHE)).split(','))
+            if all(p['mode']=='text' for p in pages) and recognizable and kind in local_kinds:
                 local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・ローカル処理（要確認）'
-            elif all(p['mode']=='text' for p in pages):
+            elif all(p['mode']=='text' for p in pages) and not recognizable:
                 raise StoreError('資料種類を確認できません。種類とPDF内容を確認してください。')
             else:mode='ai';note='AI解析が必要';cost=estimate(pages)
         items.append({'kind':kind,'hash':digest,'name':name.replace('\\','/').rsplit('/',1)[-1],'mode':mode,'status':note,'api_required':mode=='ai','estimate_jpy':cost,'pages':count})

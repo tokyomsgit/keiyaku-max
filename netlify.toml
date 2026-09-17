@@ -2,6 +2,9 @@
   publish = "public-demo-dist"
   command = "python build_live_app.py"
 
+[functions]
+  directory = "netlify/functions"
+
 [[headers]]
   for = "/*"
   [headers.values]
