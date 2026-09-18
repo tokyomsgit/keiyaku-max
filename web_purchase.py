@@ -9,6 +9,12 @@ from web_registration import PATHS, BUILDING
 from purchase_explanation_reader import read_purchase, LABELS
 
 TYPE='purchase_important_explanation'
+# The purchase disclosure describes the seller/mortgages AT THAT PAST TRANSACTION, which by
+# the current sale have almost always changed hands or been discharged. Never let them seed
+# a new unit's "current" owner/mortgage columns; only a real 謄本 (registry) should — this
+# keeps them visible in the document's own field list (for audit/reference) without letting
+# stale data masquerade as the current registry state until someone actually confirms it.
+NEVER_MASTER={'current_owner_name','current_owner_address','active_mortgages'}
 
 
 def integrated(data, fields=None):
@@ -71,7 +77,7 @@ def payload(data):
     for code,item in data['fields'].items():
         f={**copy.deepcopy(item),'field_code':code,'provenance':{'needs_review':item.get('needs_review',True),'historical':True,'verified_against_original':item.get('verified_against_original',False),'ai_confidence':item.get('ai_confidence'),'verified_at':item.get('verified_at')}}
         fields.append(f)
-        if not item.get('needs_review') and item.get('value') is not None:
+        if code not in NEVER_MASTER and not item.get('needs_review') and item.get('value') is not None:
             (b if code in BUILDING else u)[code]=copy.deepcopy(item['value'])
     if b.get('land_lots'):
         b['land_lots']=[{k:x.get(k) for k in ('location','lot_number','land_category','area')} for x in b['land_lots']]

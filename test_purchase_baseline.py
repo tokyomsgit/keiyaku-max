@@ -47,6 +47,21 @@ class PurchaseTests(unittest.TestCase):
             data['property_type']=kind
             with self.assertRaises(StoreError):payload(data)
 
+    def test_payload_never_seeds_owner_or_mortgages_even_when_confident(self):
+        # The seller/mortgages the purchase disclosure describes are from that PAST
+        # transaction; by the current sale they've almost always changed or been
+        # discharged, so they must never become a new unit's "current" master value
+        # even when the AI read them with full confidence (needs_review=False).
+        data=sample()
+        data['fields']['current_owner_address']={**data['fields']['current_owner_name'],'value':'旧試験住所'}
+        data['fields']['active_mortgages']={**data['fields']['current_owner_name'],'value':[{'rank':1,'amount':1000}]}
+        p=payload(data)
+        self.assertNotIn('current_owner_name',p['unit']);self.assertNotIn('current_owner_address',p['unit'])
+        self.assertNotIn('active_mortgages',p['unit'])
+        # Still recorded on the document itself, for audit/reference.
+        codes={f['field_code'] for f in p['documents'][0]['values']}
+        self.assertIn('current_owner_name',codes);self.assertIn('active_mortgages',codes)
+
     def test_demo_no_network_and_raw_cache_reused(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'source.pdf';p.write_bytes(b'%PDF-fixture');root=Path(tmp)/'cache'
