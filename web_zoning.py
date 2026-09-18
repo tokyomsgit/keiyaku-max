@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from web_data import StoreError, env, ROOT
 from web_reading import read_existing
+from zoning_reader import ZONE_FIELDS
 
 
 def cached(digest, output):
@@ -75,6 +76,31 @@ def _latest_version(workspace, document_id):
     values = workspace.rest(f"extracted_values?document_version_id=eq.{versions[0]['document_version_id']}&field_code=eq.zoning_info&select=value")
     versions[0]['zones'] = (values[0]['value'] if values else []) or []
     return versions[0]
+
+
+def seed_from_purchase(workspace, building_id, fields, source_label):
+    """A 重要事項説明書 must legally state 法令上の制限 (用途地域 etc.), so the purchase-
+    disclosure reader can often capture it even with no dedicated 用途地域資料 uploaded yet.
+    Called once, right after a purchase-disclosure registers a building. Only ever creates
+    a FIRST zoning document — if one already exists (a real dedicated PDF, or an earlier
+    seed), this is a no-op, since a purpose-built reading should never be replaced by a
+    weaker one extracted incidentally from a different document. Always needs_review=True
+    per field, matching read_zoning_ai()'s AI-vision convention: this is a general-purpose
+    document being asked about a specific section, not a dedicated certificate reader."""
+    if not building_id or not fields:return
+    zone = {code: {'value': item['value'], 'page_no': item.get('page_no'), 'source_text': item.get('source_text'), 'needs_review': True}
+        for code, item in fields.items() if code in ZONE_FIELDS and item.get('value') not in (None, '')}
+    if not zone:return
+    try:
+        if workspace.rest(f'documents?document_type=eq.zoning&building_id=eq.{building_id}&unit_id=is.null&select=document_id'):return
+        created = workspace.rest('documents', {'document_type': 'zoning', 'building_id': building_id, 'title': '用途地域資料'}, 'POST', write=True)
+        version = workspace.rest('document_versions', {'document_id': created[0]['document_id'], 'version_no': 1,
+            'source_type': 'historical_purchase_document', 'status': 'provisional', 'original_filename': source_label}, 'POST', write=True)
+        zones = [{**zone, 'zone_label': None, 'needs_review': True, 'source_filename': source_label}]
+        workspace.rest('extracted_values', {'document_version_id': version[0]['document_version_id'], 'field_code': 'zoning_info',
+            'value': zones, 'confidence': None, 'page_no': 1, 'source_text': source_label,
+            'reviewed': False, 'approved': False}, 'POST', write=True)
+    except StoreError:pass
 
 
 def attach_snapshot(workspace, case, building_id):

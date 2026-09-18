@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from web_zoning import cached, prepare, upload, zone_view
+from web_zoning import cached, prepare, seed_from_purchase, upload, zone_view
 
 
 def blank_pdf(width=200):
@@ -143,6 +143,29 @@ class ZoningMergeTest(unittest.TestCase):
         self.assertTrue(result['reused'])
         self.assertEqual(len(self.w.tables['document_versions']), 1)
         self.assertEqual(len(self.w.tables['extracted_values'][-1]['value']), 1)
+
+    def test_seed_from_purchase_creates_a_first_zoning_document(self):
+        # A 重要事項説明書 must legally state 用途地域 etc., so this can seed a first (weaker,
+        # needs_review) zoning reading even with no dedicated 用途地域資料 uploaded yet.
+        fields={'zoning_type':{'value':'商業地域','page_no':2,'source_text':'商業地域'},
+                'floor_area_ratio':{'value':'500%','page_no':2,'source_text':'500%'},
+                'target_address':{'value':'not a zone field, must be ignored'}}
+        seed_from_purchase(self.w,'bldg-1',fields,'購入時重説.pdf')
+        values=self.w.tables['extracted_values']
+        self.assertEqual(len(values),1)
+        zones=values[0]['value']
+        self.assertEqual(len(zones),1)
+        self.assertIsNone(zones[0]['zone_label'])
+        self.assertTrue(zones[0]['needs_review'])
+        self.assertIn('zoning_type',zones[0])
+        self.assertIn('floor_area_ratio',zones[0])
+        self.assertNotIn('target_address',zones[0])
+
+    def test_seed_from_purchase_never_overwrites_an_existing_zoning_document(self):
+        self.w.tables['documents'].append({'document_id':'doc-1','document_type':'zoning','building_id':'bldg-1','unit_id':None})
+        seed_from_purchase(self.w,'bldg-1',{'zoning_type':{'value':'商業地域','page_no':1,'source_text':'x'}},'購入時重説.pdf')
+        self.assertEqual(self.w.tables['document_versions'],[])
+        self.assertEqual(self.w.tables['extracted_values'],[])
 
     def test_four_zones_ok_but_a_fifth_is_rejected(self):
         # Rare but real: a property can straddle up to four 用途地域 (A-D).

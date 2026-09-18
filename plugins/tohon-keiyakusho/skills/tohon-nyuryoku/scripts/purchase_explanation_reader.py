@@ -10,6 +10,7 @@ from pathlib import Path
 from important_report_reader import pdf_pages, content_for_pdf
 from important_report_schema import obj, nullable, ITEM, MAPPING as REPORT, compact
 from management_rules_schema import MAPPING as RULES
+from zoning_reader import LABELS as ZONING_LABELS, ZONE_FIELDS as ZONING_FIELDS
 from supabase_store import env, canonical, NoRedirect, StoreError
 
 REGISTRY = {
@@ -21,7 +22,12 @@ REGISTRY = {
  'current_owner_name':'資料当時の登記名義人','current_owner_address':'資料当時の登記名義人住所',
  'active_mortgages':'資料当時の抵当権'}
 PURCHASE=json.loads(Path(__file__).with_name('purchase_mapping.json').read_text(encoding='utf8'))
-LABELS={**{k:v['label'] for k,v in REPORT.items()},**{k:v['label'] for k,v in RULES.items()},**REGISTRY,**{k:v['label'] for k,v in PURCHASE.items()}}
+# 法令上の制限（用途地域・建ぺい率・容積率など）は重要事項説明書の必須記載事項のため、専用の
+# 用途地域資料が無くても購入時重説自体から拾えることが多い。zoning_reader側の項目定義をそのまま
+# 再利用し、値の書式（例:"80%"、"17m第二種"）も揃える。ZONING側で読む側だけの項目
+# （reference_date/municipality/target_address）はこの資料の主目的ではないため含めない。
+ZONING={code:ZONING_LABELS[code] for code in ZONING_FIELDS}
+LABELS={**{k:v['label'] for k,v in REPORT.items()},**{k:v['label'] for k,v in RULES.items()},**REGISTRY,**{k:v['label'] for k,v in PURCHASE.items()},**ZONING}
 NUMBER={'registered_area','land_right_numerator','land_right_denominator','total_units','management_fee','repair_reserve_fee','wall_center_area','sale_price','earnest_money'}
 KINDS=('condominium_land_right','condominium_no_land_right','leasehold_condominium','detached_house','unknown')
 API_SCHEMA=obj({'is_purchase_explanation':{'type':'boolean'},'property_type':{'type':'string','enum':list(KINDS)},
@@ -39,6 +45,11 @@ active_mortgagesはJSON配列の文字列。順位rank、種類type、債権額a
 原文ラベル、セクション、短い逐語引用、ページ、confidenceを保持。不鮮明、複数候補、不明はnull。
 存在する項目だけfieldsへ返す。未記載の項目を作らない。重要事項調査報告書や管理規約だけならis_purchase_explanation=false。
 property_typeは区分所有建物かどうかを本文で確認して判断。名称だけでは判断しない。
+「法令上の制限」の用途地域等のチェック欄も対象。zoning_type/fire_zone/semi_fire_zoneはチェックされている
+項目名をそのまま（例:商業地域、防火地域）。building_coverage_ratio/floor_area_ratioは数字と%を付けた文字列
+（例:80%）。height_districtは種別と最高限度から「最高限度+m+種別の略称」の順（例:第二種高度地区・最高限度
+17mなら17m第二種）、最低限度の指定があれば別途minimum_height_districtへ。用途地域が複数のチェックにまた
+がるなど一意に決まらない項目はvalue:null。
 '''
 
 

@@ -168,6 +168,10 @@ def register(workspace,token,case_mode,resume_case_id=None):
         request_key=hashlib.sha256(token.encode()).hexdigest())
     result=workspace.rpc('rpc/web_register_registry_case',p,write=True)
     if not result.get('case_id'):raise StoreError('照合結果が変わりました。登録前の確認をやり直してください。')
+    if result.get('building_id') and p.get('raw_json',{}).get('format')=='normalized_purchase_v1':
+        from web_zoning import seed_from_purchase
+        fields={f['field_code']:f for f in p.get('fields') or []}
+        seed_from_purchase(workspace,result['building_id'],fields,(p.get('documents') or [{}])[0].get('original_filename') or '購入時重要事項説明書')
     workspace.refresh()
     # Keep the receipt across restarts without modifying the extracted JSON.
     folder=workspace.output/'imports'/pending['cid']
