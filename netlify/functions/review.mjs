@@ -69,10 +69,12 @@ async function bundle(unitId, buildingId) {
   }
   const result = [...groups.values()].filter(g => g.candidates.length);
   for (const group of result) {
-    // Selectable candidates are preferred for the 推奨 pick, but a newer candidate is still
-    // suggested over an equally-unconfirmed baseline when nothing here has full evidence yet.
+    // Only a selectable (trusted) candidate can ever be recommended: the adopt RPCs always
+    // reject an unselectable one (registry_provenance.needs_review etc.), so defaulting the
+    // radio to one just guarantees a failed confirm — and since confirm() below submits every
+    // group in one batch, one bad default used to break every OTHER field's confirm too.
     const dated = c => c.as_of_date || '';
-    const ranked = [...group.candidates].sort((a, b) => (b.selectable - a.selectable) || dated(b).localeCompare(dated(a)));
+    const ranked = [...group.candidates].filter(c => c.selectable).sort((a, b) => dated(b).localeCompare(dated(a)));
     const best = ranked[0];
     group.recommended_diff_id = best && dated(best) > dated(group.baseline) ? best.diff_id : null;
   }
@@ -83,12 +85,17 @@ async function confirm(caseId, unitId, buildingId, selections) {
   const groups = await bundle(unitId, buildingId);
   const byField = new Map(groups.map(g => [g.field_code, g]));
   const results = [];
+  const failures = [];
+  // Each group's RPC calls are independent of every other group's, so one group failing
+  // (a stale candidate, or a candidate whose evidence turned out insufficient) must not
+  // stop unrelated fields elsewhere in the same batch from being confirmed.
   for (const selection of selections || []) {
     const group = byField.get(String(selection.field_code || ''));
     if (!group) continue; // Already resolved or unknown; nothing to do.
     const chosenId = selection.diff_id ? String(selection.diff_id) : null;
     if (chosenId && !group.candidates.some(c => c.diff_id === chosenId)) {
-      throw new Failure(409, `「${group.label}」の候補が変わりました。画面を再読込してください。`);
+      failures.push(`「${group.label}」の候補が変わりました。画面を再読込してください。`);
+      continue;
     }
     for (const candidate of group.candidates) {
       const adopt = candidate.diff_id === chosenId;
@@ -99,10 +106,15 @@ async function confirm(caseId, unitId, buildingId, selections) {
         : candidate.document_type === 'management_rules'
           ? { name: 'review_management_rules_diff', p: { case_id: caseId, diff_id: candidate.diff_id, action: adopt ? 'adopt' : 'hold' } }
           : { name: 'web_review_diff', p: { unit_id: unitId, diff_id: candidate.diff_id, action: adopt ? 'adopt' : 'hold' } };
-      const response = await db(`rpc/${body.name}`, { method: 'POST', body: JSON.stringify({ p: body.p }) });
-      results.push({ field_code: group.field_code, diff_id: candidate.diff_id, ...response });
+      try {
+        const response = await db(`rpc/${body.name}`, { method: 'POST', body: JSON.stringify({ p: body.p }) });
+        results.push({ field_code: group.field_code, diff_id: candidate.diff_id, ...response });
+      } catch (error) {
+        failures.push(`「${group.label}」: ${error instanceof Failure ? error.message : '確定できませんでした。'}`);
+      }
     }
   }
+  if (failures.length) throw new Failure(409, failures.join(' '));
   return results;
 }
 

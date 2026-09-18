@@ -191,10 +191,12 @@ async function confirmReviews(item,groups){
     const chosen=document.querySelector(`input[name="review-${CSS.escape(group.field_code)}"]:checked`)?.value;
     return {field_code:group.field_code,diff_id:chosen&&chosen!=='baseline'?chosen:null};
   });
-  try{
-    await reviewApi('confirm','POST',{case_id:item.id,selections});
-    detail(item.id);
-  }catch(error){status.textContent=error.message;button.disabled=false;}
+  let error=null;
+  try{await reviewApi('confirm','POST',{case_id:item.id,selections});}catch(e){error=e;}
+  // Refresh either way: each field confirms independently server-side, so an error from one
+  // field must not hide that the others in this same batch were already saved successfully.
+  await detail(item.id);
+  if(error){const refreshedStatus=document.querySelector('#review-status');if(refreshedStatus)refreshedStatus.textContent=error.message;}
 }
 
 async function generate(item){
