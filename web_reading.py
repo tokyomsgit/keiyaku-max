@@ -27,5 +27,20 @@ def read_existing(reader, pdf, *args, **kwargs):
         elif any(x in message for x in ('connection','getaddrinfo','urlopen','接続')):
             reason='API接続エラー：ネットワーク・API設定を管理者が確認してください。'
         elif isinstance(exc,StoreError):raise
-        else:reason='読取処理エラー：PDFの内容とAPI接続を管理者が確認してください。'
+        else:reason='読取処理エラー：PDFの内容とAPI接続を管理者が確認してください。（詳細：'+detail(exc)+'）'
         raise StoreError(reason) from None
+
+
+def detail(exc):
+    """Content-free hint for the admin: a known reader failure by name, otherwise the type and where it was raised."""
+    import re
+    import traceback
+    from pathlib import Path
+    text=str(exc)
+    known=re.search(r'AI API HTTP \d+',text)
+    if known:return known.group()
+    known=re.search(r'AIの応答が未完了です: (\w+)',text)
+    if known:return 'AI応答未完了 '+known.group(1)
+    if '構造化データが返りませんでした' in text:return 'AIが空応答'
+    frames=traceback.extract_tb(exc.__traceback__)
+    return type(exc).__name__+(f' @ {Path(frames[-1].filename).name}:{frames[-1].lineno}' if frames else '')
