@@ -7,6 +7,8 @@ import { Failure, UUID, authenticate, db, reply } from '../lib/common.mjs';
 import * as ZMAP from '../lib/zoning_excel_map.mjs';
 
 const TEMPLATE = 'supabase/functions/keiyaku-api/contract-template.xlsm';
+// For now only 謄本 is read (see ACTIVE_KINDS in cloud_worker.py). Set true to write zoning again.
+const READ_ZONING = false;
 
 function templateBytes() {
   const roots = [process.env.LAMBDA_TASK_ROOT, process.cwd(), path.resolve('.')].filter(Boolean);
@@ -278,7 +280,8 @@ async function generate(caseId) {
   const open = ids.length ? await db(`value_diffs?document_id=in.(${ids.join(',')})&review_status=eq.unreviewed&select=diff_id`) : [];
   if (open.length) throw new Failure(409, `あと${open.length}件確認すると契約書を生成できます。`);
   if (!realCase) realCase = (await db(`cases?unit_id=eq.${unitId}&select=*&order=updated_at.desc&limit=1`))[0] || {};
-  const zoningDocs = unit.building_id ? await db(`documents?document_type=eq.zoning&building_id=eq.${unit.building_id}&select=document_id`) : [];
+  // For now only 謄本 is read and the zoning card is hidden, so zoning already on file is not written either.
+  const zoningDocs = READ_ZONING && unit.building_id ? await db(`documents?document_type=eq.zoning&building_id=eq.${unit.building_id}&select=document_id`) : [];
   let zones = [];
   if (zoningDocs.length) {
     const versions = await db(`document_versions?document_id=eq.${zoningDocs[0].document_id}&select=document_version_id&order=version_no.desc&limit=1`);

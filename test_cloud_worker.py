@@ -22,6 +22,18 @@ class CloudWorkerTest(unittest.TestCase):
         self.assertEqual(w.classify('用途地域.pdf', blank), 'zoning')
         self.assertIsNone(w.classify('scan001.pdf', blank))
 
+    def test_only_registry_is_read(self):
+        blank = b'%PDF-1.4\n%%EOF'
+        job = {'kinds': {'z': 'zoning'}}
+        files = [('購入時重説.pdf', blank, 'p'), ('重調.pdf', blank, 'r'), ('用途地域資料.pdf', blank, 'z')]
+        result = w.read_files(job, files, Path(tempfile.gettempdir()))
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('購入時重説.pdf、重調.pdf、用途地域資料.pdf', result['message'])
+        self.assertIn('謄本（建物・土地）のPDFを追加', result['message'])
+        unknown = w.read_files({}, [('scan001.pdf', blank, 's'), ('重調.pdf', blank, 'r')], Path(tempfile.gettempdir()))
+        self.assertEqual(unknown['status'], 'needs_kind')
+        self.assertEqual(unknown['unknown'], [{'hash': 's', 'name': 'scan001.pdf'}])
+
     def test_cache_round_trip_rejects_foreign_paths(self):
         digest = 'a' * 64
         with tempfile.TemporaryDirectory() as folder:
