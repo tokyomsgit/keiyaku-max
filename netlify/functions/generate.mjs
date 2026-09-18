@@ -1,12 +1,14 @@
-// Contract generation from confirmed DB values into the production XLSM template.
+// Contract generation from confirmed DB values into the production template.
 // Ported from supabase/functions/keiyaku-api generate(); formula cells are never overwritten.
+// The template is a macro-free .xlsx: the typo-check and text-export macros it used to carry
+// were not needed, and a downloaded .xlsm has its macros blocked by Excel anyway.
 import fs from 'node:fs';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { Failure, UUID, authenticate, db, reply } from '../lib/common.mjs';
 import * as ZMAP from '../lib/zoning_excel_map.mjs';
 
-const TEMPLATE = 'supabase/functions/keiyaku-api/contract-template.xlsm';
+const TEMPLATE = 'supabase/functions/keiyaku-api/contract-template.xlsx';
 // For now only 謄本 is read (see ACTIVE_KINDS in cloud_worker.py). Set true to write zoning again.
 const READ_ZONING = false;
 
@@ -300,7 +302,7 @@ export default async (request) => {
     const text = await request.text();
     if (text.length > 2000) throw new Failure(413, '入力が大きすぎます。');
     const { bytes } = await generate(String(JSON.parse(text || '{}').case_id || ''));
-    return new Response(bytes, { headers: { 'Content-Type': 'application/vnd.ms-excel.sheet.macroEnabled.12', 'Content-Disposition': "attachment; filename*=UTF-8''keiyaku-max.xlsm", 'Cache-Control': 'no-store' } });
+    return new Response(bytes, { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': "attachment; filename*=UTF-8''keiyaku-max.xlsx", 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof Failure) return reply(error.status, { error: error.message });
     if (error instanceof SyntaxError) return reply(400, { error: '入力内容を確認してください。' });

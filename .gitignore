@@ -5,7 +5,6 @@ public-demo-dist/
 __pycache__/
 *.pyc
 *.xlsm
-!supabase/functions/keiyaku-api/contract-template.xlsm
 *.pdf
 .env
 .env.*
@@ -14,6 +13,7 @@ output/
 verification*/
 *.xlsx
 !web/demo-contract.xlsx
+!supabase/functions/keiyaku-api/contract-template.xlsx
 *.inspect.ndjson
 *.xls
 *.zip
