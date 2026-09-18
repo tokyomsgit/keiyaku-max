@@ -71,7 +71,7 @@ console.log('PASS unmatched zone-type name is left unfilled');
 
 // End-to-end: fill() with real 2-zone data must not corrupt the workbook (package parts,
 // formula count and merged-cell count preserved), same check style as test_generate_function.mjs.
-const template = fs.readFileSync('supabase/functions/keiyaku-api/contract-template.xlsm');
+const template = fs.readFileSync('supabase/functions/keiyaku-api/contract-template.xlsx');
 const zip = await openpyxlLikeZip.loadAsync(template);
 const baseNames = Object.keys(zip.files).sort();
 const { bytes, written } = await fill(template, { unit_name: '204' }, {}, {}, zonesLikeRealExample);

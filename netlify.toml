@@ -5,7 +5,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  included_files = ["supabase/functions/keiyaku-api/contract-template.xlsm"]
+  included_files = ["supabase/functions/keiyaku-api/contract-template.xlsx"]
 
 [[headers]]
   for = "/*"
