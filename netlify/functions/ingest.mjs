@@ -6,7 +6,8 @@ const REPO = 'tokyomsgit/keiyaku-max';
 const WORKFLOW = 'cloud-ingest.yml';
 const HASH = /^[a-f0-9]{64}$/;
 const STALE_MS = 25 * 60 * 1000;
-const KINDS = ['purchase', 'registry', 'report', 'rules', 'zoning', 'skip'];
+// For now only 謄本 is read (see ACTIVE_KINDS in cloud_worker.py). Add kinds back here to re-enable.
+const KINDS = ['registry', 'skip'];
 const PROPERTY_TYPES = ['condominium_land_right', 'condominium_no_land_right', 'leasehold_condominium', 'detached_house', 'unknown'];
 
 async function storage(method, path, body, headers = {}) {
@@ -98,7 +99,8 @@ async function start(body, user) {
     const ids = [...new Set(versions.map(v => v.document_id))];
     const documents = await db(`documents?document_id=in.(${ids.join(',')})&select=document_id,unit_id,building_id,document_type`);
     // Unlinked analyses are not a usable case; the worker links them through the normal match rules.
-    const linked = new Map(documents.filter(d => d.unit_id).map(d => [d.document_id, d]));
+    // Other kinds already on file go to the worker too, which reports them as not read.
+    const linked = new Map(documents.filter(d => d.unit_id && KINDS.includes(d.document_type)).map(d => [d.document_id, d]));
     for (const v of versions) if (linked.has(v.document_id)) cachedHashes.add(v.file_hash);
     const units = [...new Set([...linked.values()].map(d => d.unit_id))];
     if (units.length > 1 || (unitId && units.length && units[0] !== unitId)) throw new Failure(409, '解析済みの資料が別の物件に登録されています。自動で紐付けせず停止しました。資料を分けて追加してください。');

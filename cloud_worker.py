@@ -16,6 +16,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 KINDS = ('purchase', 'registry', 'report', 'rules', 'zoning')
+# For now only 謄本 is read. Other kinds are recognised but set aside; add them back here to re-enable.
+ACTIVE_KINDS = ('registry',)
 UUID = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CACHE_DIRS = ('registry_cache', 'report_cache', 'purchase_cache', 'rules_cache')
 
@@ -77,6 +79,10 @@ def unpack_cache(output, digest, data):
             target = output / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(archive.read(name))
+
+
+def excluded_note(names):
+    return f"謄本以外の資料は読み込みません（{'、'.join(names)}）。" if names else ''
 
 
 def batches(kinds, case_id):
@@ -169,18 +175,22 @@ def read_files(job, files, output):
     chosen = job.get('kinds') or {}
     kinds = []
     unknown = []
+    excluded = []
     for name, content, digest in files:
         kind = chosen.get(digest) or classify(name, content)
         if kind == 'skip':
             kinds.append(None);continue
+        if kind in KINDS and kind not in ACTIVE_KINDS:
+            excluded.append(name);kinds.append(None);continue
         if kind not in KINDS:
             unknown.append({'hash': digest, 'name': name})
         kinds.append(kind)
     if unknown:
-        return {'status': 'needs_kind', 'message': '資料の種類を判定できなかったPDFがあります。種類を選んでください。', 'unknown': unknown}
+        return {'status': 'needs_kind', 'message': '謄本かどうか判定できなかったPDFがあります。謄本なら「登記簿謄本」を選んでください。', 'unknown': unknown}
+    note = excluded_note(excluded)
     selected = [(k, n, c) for k, (n, c, _) in zip(kinds, files) if k]
     if not selected:
-        return {'status': 'failed', 'message': '読み取る資料がありません。'}
+        return {'status': 'failed', 'message': note + '謄本（建物・土地）のPDFを追加してください。' if excluded else '読み取る資料がありません。'}
 
     workspace = Workspace(demo=False)
     case_id = job.get('case_id')
@@ -229,7 +239,7 @@ def read_files(job, files, output):
         reason = unsaved[0].split('。 ', 1)[-1] if '。 ' in unsaved[0] else unsaved[0]
         return {'status': 'failed', 'case_id': case_id, 'ai_calls': workspace.ai_calls,
             'message': '案件は確認できましたが、追加した資料は保存していません。' + reason + ' 資料と物件が同じか原本で確認してください。'}
-    return {'status': 'done', 'case_id': case_id, 'message': '読み取りが完了しました。', 'warnings': warnings,
+    return {'status': 'done', 'case_id': case_id, 'message': '読み取りが完了しました。' + note, 'warnings': warnings,
         'ai_calls': workspace.ai_calls}
 
 
