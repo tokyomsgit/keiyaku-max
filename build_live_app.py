@@ -10,6 +10,7 @@ def build():
       'index.html':ROOT/'web/live.html',
       'auth.js':ROOT/'web/auth.js',
       'app.js':ROOT/'web/live-app.js',
+      'guide.html':ROOT/'web/guide.html',
     }
     for name,source in files.items():OUT.joinpath(name).write_bytes(source.read_bytes())
     css='\n'.join((ROOT/'web/styles'/f'{name}.css').read_text(encoding='utf8') for name in ('theme','base','layout','components'))
