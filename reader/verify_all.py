@@ -3,6 +3,7 @@ import collections
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 import warnings
 from extract_registry import SCHEMA, API_SCHEMA, save_json, validate_evidence
@@ -62,7 +63,17 @@ def integrate(items,docs):
                 if buildings:
                     building_address=canonical(val(data,'building.location'))+canonical(val(data,'building.lot_number'))
                     house_address=canonical(val(data,'main_building.location'))
-                    if ''.join(key) not in (building_address,house_address):
+                    # A building's site can span several lot numbers listed together
+                    # (e.g. "新宿区上落合一丁目4番1、4番4、4番5" — sometimes even merged
+                    # into just building.location when lot_number itself comes back
+                    # empty), so match each individual lot rather than only the whole
+                    # combined string: otherwise a building with more than one lot
+                    # would flag EVERY one of its own land parcels as a mismatch, since
+                    # none of them individually equals the full combined text.
+                    lot_tokens=re.findall(r'\d+番\d+(?:の\d+)?',building_address)
+                    prefix=building_address[:building_address.find(lot_tokens[0])] if lot_tokens else building_address
+                    building_lots={prefix+t for t in lot_tokens} or {building_address}
+                    if ''.join(key) not in building_lots and ''.join(key) not in (building_address,house_address):
                         added['needs_review']=True;data['group_review'].append('土地と建物の対応:'+''.join(key))
                 current.append(added)
     data['lands']=current
@@ -82,7 +93,12 @@ def integrate(items,docs):
         if val(data,'leasehold.exists') is not True:data['leasehold']=copy.deepcopy(lease_docs[0]['leasehold'])
         data['tenure_type']=f('leasehold')
         data['leasehold']['needs_review']=True
-        data['group_review'].append('借地の期間満了日・更新・契約詳細（契約書等の確認が必要）')
+        # Advisory, not a contradiction: every leasehold case needs the lease contract
+        # checked independently since the registry can't fully capture its terms. This
+        # is true of EVERY leasehold_condominium, so putting it in group_review (which
+        # payload_from() treats as a hard block on registration) would make that whole
+        # property type permanently unregistrable rather than just flagged for review.
+        data.setdefault('leasehold_warnings',[]).append('借地の期間満了日・更新・契約詳細（契約書等の確認が必要）')
         # Preserve supporting lease papers separately from registry measurements.
         data['leasehold']['supporting_documents']=[{'source_pdf':d['metadata']['source_pdf'],'details':d['leasehold']['details']} for d in lease_docs]
     unit=val(data,'unit.house_number');house=val(data,'main_building.house_number')
