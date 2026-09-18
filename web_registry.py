@@ -127,6 +127,8 @@ def upload(workspace,files):
         manifest.append({'file_hash':digest,'original_filename':name,'storage_path':str(pdf.resolve())})
         items.append({'id':str(i),'path':name,'sha256':digest})
     data=integrate(items,docs);data['upload_filenames']=[r[0] for r in records]
+    # Registration no longer stops for these, so the cloud worker shows them once the case opens.
+    workspace.registry_notes=list(data.get('land_warnings',[]))
     # Text-layer land registries can supply explicit leasehold terms locally.
     # This never derives a unit's total rent from the per-3.3㎡ registry rate.
     from leasehold_reader import read_land_registry

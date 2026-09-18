@@ -56,13 +56,15 @@ class VerifyAllTest(unittest.TestCase):
     def test_building_site_with_one_lot_still_flags_a_genuinely_unrelated_parcel(self):
         # The fix must not make the mismatch check toothless: a land parcel whose lot
         # number really doesn't belong to this building's site should still be flagged.
+        # It is a warning now, not a registration blocker: the land is entered without a share.
         building = doc('building', **{'building.location': f('新宿区上落合一丁目4番地1'), 'unit.house_number': f('101')})
         unrelated_land = doc('land', **{'lands': [{'location': f('新宿区上落合一丁目'), 'lot_number': f('9番9'),
             'category': f('宅地'), 'area': f(100.0), 'identifier': f(None), 'right_type': f(None), 'right_share': f(None)}]})
         docs = {'0': building, '1': unrelated_land}
         items = [{'id': '0', 'path': 'b.pdf', 'sha256': 'x' * 64}, {'id': '1', 'path': 'l.pdf', 'sha256': 'y' * 64}]
         data = integrate(items, docs)
-        self.assertIn('土地と建物の対応:新宿区上落合一丁目9番9', data['group_review'])
+        self.assertNotIn('土地と建物の対応:新宿区上落合一丁目9番9', data['group_review'])
+        self.assertTrue(any('新宿区上落合一丁目9番9' in w for w in data['land_warnings']))
 
     def test_leasehold_advisory_is_not_a_registration_blocker(self):
         # 借地の期間満了日... is informational (true for every leasehold_condominium),

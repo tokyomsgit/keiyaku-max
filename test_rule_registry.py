@@ -232,19 +232,20 @@ class LandLedgerTest(unittest.TestCase):
 
 
 class PrivateRoadTest(unittest.TestCase):
-    def build(self, road_owner):
+    def build(self, road_owner, sellers='株式会社テスト不動産', owners=None):
         building = blank(API_SCHEMA)
         building.update(document_type=f('building'), metadata={'source_pdf': 'b.pdf'})
         building['building'].update(location=f('港区架空一丁目'), lot_number=f('12番地3'))
         building['unit']['house_number'] = f('架空一丁目12番3の5')
         building['land_right']['exists'] = f(True)
-        building['owner']['name'] = f('株式会社テスト不動産')
+        building['owner']['name'] = f(sellers)
         building['lands'] = [{**blank(API_SCHEMA['properties']['lands']['items']), 'location': f('港区架空一丁目'), 'lot_number': f('12番3'),
                               'right_type': f('所有権'), 'right_share': f('10万分の5000')}]
         road = blank(API_SCHEMA)
         road.update(document_type=f('land'), metadata={'source_pdf': 'r.pdf'})
         road['lands'] = [{**blank(API_SCHEMA['properties']['lands']['items']), 'location': f('港区架空一丁目'), 'lot_number': f('12番9'), 'category': f('公衆用道路')}]
-        road['lands'][0]['owners'] = [{'name': f(road_owner), 'address': f('港区'), 'share': f('10分の1'), 'rank': f('3'), 'corporate_number': f()}]
+        person = lambda name, share: {'name': f(name), 'address': f('港区'), 'share': f(share), 'rank': f('3'), 'corporate_number': f()}
+        road['lands'][0]['owners'] = [person(n, s) for n, s in (owners or [(road_owner, '10分の1')])]
         return integrate([{'id': 'b', 'path': 'b.pdf', 'sha256': ''}, {'id': 'r', 'path': 'r.pdf', 'sha256': ''}], {'b': building, 'r': road})
 
     def test_road_outside_the_site_is_included_when_the_seller_owns_part_of_it(self):
@@ -253,11 +254,18 @@ class PrivateRoadTest(unittest.TestCase):
         self.assertEqual(v(data, 'lands.1.right_share'), '10分の1')
         self.assertTrue(data['land_warnings'])
 
-    def test_road_the_seller_does_not_own_still_stops_registration(self):
+    def test_road_the_seller_does_not_own_is_entered_with_a_warning(self):
         data = self.build('近隣の別会社')
-        self.assertEqual(data['group_review'], ['土地と建物の対応:港区架空一丁目12番9'])
-        from web_registration import blocked_reason
-        self.assertIn('売主も所有者に入っていません', blocked_reason('condominium_land_right', data['group_review']))
+        self.assertEqual(data['group_review'], [])
+        self.assertEqual(v(data, 'lands.1.lot_number'), '12番9')
+        self.assertIsNone(v(data, 'lands.1.right_share'))
+        self.assertIn('売主も所有者に入っていない土地です', data['land_warnings'][0])
+
+    def test_co_owned_sellers_have_their_land_shares_added_up(self):
+        data = self.build(None, sellers='甲野一郎\n甲野花子', owners=[('甲野一郎', '10000分の120'), ('甲野花子', '10000分の80'), ('別の人', '10分の9')])
+        self.assertEqual(data['group_review'], [])
+        self.assertEqual(v(data, 'lands.1.right_share'), '10000分の200')
+        self.assertIn('共有名義', data['land_warnings'][0])
 
 
 class TextHelpersTest(unittest.TestCase):
