@@ -202,24 +202,28 @@ def parse_table_format(lines_raw,page_no=1):
     follow on the same line from the table's right-hand column."""
     fields={}
     text='\n'.join(lines_raw)
+    # Anchored to line start (^) rather than a bare substring search: an unanchored
+    # 地区計画\s+(...) matches inside an unrelated longer value that merely ENDS in
+    # "地区計画" (e.g. a real district-plan name like "新川・茅場町地区地区計画"), then
+    # captures the following line's unrelated content as if it were that label's value.
     single=[
-      ('zoning_type',r'用途地域\s+([^\s　]+地域)'),
-      ('building_coverage_ratio',r'建[ぺ蔽]い?率\s+([0-9０-９]+[%％])'),
-      ('floor_area_ratio',r'容積率\s+([0-9０-９]+[%％])'),
-      ('special_use_district',r'特別用途地区\s+(?:文教地区)?\s*([^\s　]+)'),
-      ('district_plan',r'地区計画\s+([^\s　]+)'),
-      ('height_use_district',r'高度利用地区\s+([^\s　]+)'),
+      ('zoning_type',r'^\s*用途地域\s+([^\s　]+地域)'),
+      ('building_coverage_ratio',r'^\s*建[ぺ蔽]い?率\s+([0-9０-９]+[%％])'),
+      ('floor_area_ratio',r'^\s*容積率\s+([0-9０-９]+[%％])'),
+      ('special_use_district',r'^\s*特別用途地区\s+(?:文教地区)?\s*([^\s　]+)'),
+      ('district_plan',r'^\s*地区計画\s+([^\s　]+)'),
+      ('height_use_district',r'^\s*高度利用地区\s+([^\s　]+)'),
     ]
     for code,pattern in single:
-        hits=[(m.group(0).strip(),m.group(1)) for m in re.finditer(pattern,text)]
+        hits=[(m.group(0).strip(),m.group(1)) for m in re.finditer(pattern,text,re.M)]
         _single(fields,code,[(l,_clean(v)) for l,v in dict.fromkeys(hits)])
-    fire=re.search(r'防火地域[・／]準防火地域\s+([^\s　]+)',text)
+    fire=re.search(r'^\s*防火地域[・／]準防火地域\s+([^\s　]+)',text,re.M)
     if fire:
         value=_clean(fire.group(1));key='semi_fire_zone' if value.startswith('準防火') else 'fire_zone' if value.startswith('防火') else None
         if key:fields[key]={'value':value,'page_no':page_no,'source_text':fire.group(0).strip(),'needs_review':False}
-    road=re.search(r'都市計画道路\s+種別\s+([^\s　]+)',text)
+    road=re.search(r'^\s*都市計画道路\s+種別\s+([^\s　]+)',text,re.M)
     if road:fields['planned_road']={'value':_clean(road.group(1)),'page_no':page_no,'source_text':road.group(0).strip(),'needs_review':False}
-    shadow=re.search(r'日影規制\s+時間\s+([^\s　]+)',text)
+    shadow=re.search(r'^\s*日影規制\s+時間\s+([^\s　]+)',text,re.M)
     if shadow:fields['shadow_restriction']={'value':_clean(shadow.group(1)),'page_no':page_no,'source_text':shadow.group(0).strip(),'needs_review':False}
     address=re.search(r'住所\s*[：:]\s*([^\n]+?)(?:\s{2,}|$)',text,re.M)
     if address:fields['target_address']={'value':_clean(address.group(1)),'page_no':page_no,'source_text':address.group(0).strip(),'needs_review':False}

@@ -20,6 +20,13 @@ class ZoningReaderTest(unittest.TestCase):
         self.assertEqual(fields['floor_area_ratio']['value'],'200%')
         self.assertEqual(fields['reference_date']['value'],'2025-12-08')
 
+    def test_table_format_label_is_not_matched_mid_word(self):
+        # A real district-plan NAME can itself end in "地区計画" (e.g. "新川・茅場町地区地区計画").
+        # An unanchored 地区計画\s+(...) regex matches inside that word and then wrongly grabs
+        # the next line's unrelated text as if it were this field's value.
+        fields=parse_text('新川・茅場町地区地区計画\nー\n')
+        self.assertNotIn('district_plan',fields)
+
     def test_ambiguous_values_are_not_invented(self):
         fields=parse_text('用途地域 第１種住居地域\n用途地域 商業地域')
         self.assertNotIn('zoning_type',fields)
