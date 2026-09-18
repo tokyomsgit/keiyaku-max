@@ -51,7 +51,8 @@ def rf(value,row,col,review=False):
 
 def fraction(value):
     text=normalize(str(value)).replace(',','')
-    text=re.sub(r'(\d+)万',lambda m:str(int(m[1])*10000),text)
+    # "32万7285" is 327285: a 万/億 multiplies its own digits and the digits after it are added.
+    text=re.sub(r'(?:(\d+)億)?(?:(\d+)万)?(\d*)',lambda m:str(int(m[1] or 0)*10**8+int(m[2] or 0)*10**4+int(m[3] or 0)) if '万' in m[0] or '億' in m[0] else m[0],text)
     m=re.fullmatch(r'(\d+)分の(\d+)',text)
     if m and 0<int(m[2])<=int(m[1]):return int(m[2]),int(m[1])
     m=re.fullmatch(r'(\d+)/(\d+)',text)
@@ -81,7 +82,8 @@ def schema_projection(data,schema=SCHEMA):
     return data
 
 
-def normalize_document(raw,pages,source_pdf='',reviewed=False):
+def normalize_document(raw,pages,source_pdf='',reviewed=False,table_read=False):
+    """table_read: raw came from rule_registry, which already read these rows, so the AI corrections below are skipped."""
     data=blank(API_SCHEMA); data.update(copy.deepcopy({k:v for k,v in raw.items() if k in API_SCHEMA['properties']}))
     data['corrections']=[]; data['history']={'raw_current_candidates':copy.deepcopy(raw),'rows':rows_from_pages(pages)}
     data['history']['extraction_warnings']=copy.deepcopy(data['warnings']);data['warnings']=[]
@@ -121,7 +123,7 @@ def normalize_document(raw,pages,source_pdf='',reviewed=False):
         if not full_text and not reviewed:node['needs_review']=node['value'] is not None
     rows=data['history']['rows']
     # One land title is a sequence of modifications, not a list of parcels.
-    if is_land and full_text and compact.count('表題部(土地の表示)')==1 and '閉鎖' not in compact:
+    if not table_read and is_land and full_text and compact.count('表題部(土地の表示)')==1 and '閉鎖' not in compact:
         current=blank(SCHEMA['properties']['lands']['items'])
         for row in rows:
             if row['section']!='title':continue
@@ -136,7 +138,7 @@ def normalize_document(raw,pages,source_pdf='',reviewed=False):
         if all(current[k]['value'] is not None for k in ('location','lot_number','category','area')):
             change(data,'lands',[current],'過去履歴誤採用','表題部各列の最後の変更を現在値に統合')
 
-    if full_text and (is_unit or is_house):
+    if not table_read and full_text and (is_unit or is_house):
         target='main_building' if is_house else 'building'
         for row in rows:
             if row['section']!='title':continue
@@ -205,7 +207,7 @@ def normalize_document(raw,pages,source_pdf='',reviewed=False):
     # remain reviewable instead of silently replacing all co-owners.
     arows=[r for r in rows if r['section']=='A' and len(r['columns'])==4]
     transfers=[(i,r) for i,r in enumerate(arows) if normalize(r['columns'][1]) in ('所有権移転','所有権保存')]
-    if full_text and transfers:
+    if not table_read and full_text and transfers:
         i,last=transfers[-1]
         later=arows[i+1:]
         if not any('移転' in normalize(r['columns'][1]) and '住所' not in normalize(r['columns'][1]) for r in later):
@@ -220,18 +222,18 @@ def normalize_document(raw,pages,source_pdf='',reviewed=False):
                 for k in ('name','address'):
                     value='\n'.join(p[k]['value'] for p in persons if p[k]['value'])
                     data['owner'][k]={'value':value or None,'sources':[s for p in persons for s in p[k]['sources']], 'needs_review':any(p[k].get('needs_review') for p in persons)}
-    if full_text and is_land and len(arows)>30:
+    if not table_read and full_text and is_land and len(arows)>30:
         people,uncertain=ownership_ledger(arows)
         change(data,'owners',people,'所有者判定','共有者の全部持分移転・住所変更を順次適用。未確定な残余持分は要確認')
         data['owner']={'name':f(None,review=True),'address':f(None,review=True)}
         if uncertain:data.setdefault('review_fields',[]).append('owners')
 
     b_rows=[r for r in rows if r['section']=='B' and len(r['columns'])==4]
-    if full_text:
+    if not table_read and full_text:
         mortgages=parse_mortgages(b_rows)
         if mortgages:change(data,'mortgages',mortgages,'抵当権判定','乙区の設定順位と明示的抹消対象を照合。複雑な付記は要確認')
     lease_rows=[r for r in b_rows if '地上権設定' in normalize(r['columns'][1]) or '賃借権設定' in normalize(r['columns'][1])]
-    if lease_rows:
+    if not table_read and lease_rows:
         r=lease_rows[0]; kind='地上権' if '地上権' in r['columns'][1] else '賃借権'
         rank=normalize(r['columns'][0]); cancelled=any(re.search(re.escape(rank)+r'番'+kind+'抹消',normalize(x['columns'][1])) for x in b_rows)
         if not cancelled:

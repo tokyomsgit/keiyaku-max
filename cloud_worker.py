@@ -205,11 +205,14 @@ def read_files(job, files, output):
 
     from web_documents import upload as upload_documents
     from web_registration import advance, choose_candidate
-    warnings = []
+    # The web screen opens the case as soon as the job is done and shows these under it.
+    warnings = [note] if note else []
     for group in batches([k for k in kinds if k], case_id):
         uploads = [selected[i] for i in group]
         authorize(workspace, plan['token'], uploads, True)
         staged = upload_documents(workspace, case_id, uploads)
+        warnings += ['【注意】' + n for n in getattr(workspace, 'registry_notes', [])]
+        workspace.registry_notes = []
         verification = purchase_verification_needed(workspace, staged.get('case_id'), job)
         if verification:
             return verification

@@ -1,6 +1,7 @@
 """全案件のキャッシュ再処理・統合・Excel検証。APIは呼ばない。"""
 import collections
 import copy
+from fractions import Fraction
 import hashlib
 import json
 import re
@@ -74,20 +75,42 @@ def integrate(items,docs):
                     prefix=building_address[:building_address.find(lot_tokens[0])] if lot_tokens else building_address
                     building_lots={prefix+t for t in lot_tokens} or {building_address}
                     if ''.join(key) not in building_lots and ''.join(key) not in (building_address,house_address):
-                        added['needs_review']=True;data['group_review'].append('土地と建物の対応:'+''.join(key))
+                        # Not in the building's 所在: a private road or similar sold with the unit,
+                        # but only when the seller is one of its owners (checked below).
+                        added['outside_site']=''.join(key)
                 current.append(added)
     data['lands']=current
     # Non-land-right condominium ownership shares belong to the current target
     # owner, never to an arbitrary co-owner of the parcel.
     names=[normalize(x) for x in (val(data,'owner.name') or '').splitlines()]
-    if buildings and val(data,'land_right.exists') is False:
-        for land in data['lands']:
-            matched=[p for p in land.get('owners',[]) if normalize(p['name']['value'] or '') in names]
-            if len(names)==1 and len(matched)==1 and not matched[0]['share'].get('needs_review'):
-                p=matched[0]
-                land['right_type']={'value':'所有権','sources':copy.deepcopy(p['name']['sources']),'needs_review':False}
-                land['right_share']=copy.deepcopy(p['share'])
-            elif land.get('owners'):data['group_review'].append('土地共有持分の対象所有者との対応')
+    # These never stop registration: what can be read is entered and the rest is left to a
+    # warning the person checks against the registry (co-owned sellers, leasehold, a land
+    # the seller does not own).
+    warn=lambda text:data.setdefault('land_warnings',[]).append(text)
+    for land in data['lands']:
+        outside=land.pop('outside_site',None)
+        if not buildings or (not outside and val(data,'land_right.exists') is not False):continue
+        label=(val(land,'location') or '')+(val(land,'lot_number') or '')
+        owners=land.get('owners',[])
+        found=[m[0] for m in ([p for p in owners if normalize(p['name']['value'] or '')==n] for n in names) if len(m)==1]
+        if names and len(found)==len(names):
+            parts=[Fraction(*fraction(p['share']['value'])) if fraction(p['share']['value'] or '') else Fraction(1) if len(owners)==1 else None for p in found]
+            if all(parts):
+                total=sum(parts)
+                printed=fraction(found[0]['share']['value'] or '')
+                den=printed[1] if printed and (total*printed[1]).denominator==1 else total.denominator
+                share=None if total==1 else found[0]['share']['value'] if len(found)==1 else f'{den}分の{total*den}'
+                land['right_type']={'value':'所有権','sources':copy.deepcopy(found[0]['name']['sources']),'needs_review':False}
+                land['right_share']={'value':share,'sources':[s for p in found for s in p['share']['sources']],'needs_review':False}
+                if len(found)>1:warn(f'共有名義のため、売主{len(found)}名の土地持分を合計して入力しました: {label}')
+                if any(p['share'].get('needs_review') for p in found):warn(f'土地の持分は甲区の登記をたどって計算した値です。原本で確認してください: {label}')
+                if outside:warn('建物の所在に載っていない土地を、売主の持分がある土地（私道など）として含めました: '+label)
+                continue
+            warn(f'売主の土地持分を読み取れなかったため、持分は空欄です。原本で確認してください: {label}')
+        elif outside and not found:
+            warn(f'建物の所在に載っておらず、売主も所有者に入っていない土地です。持分は空欄です。別の物件の謄本でないか確認してください: {label}')
+        elif owners:
+            warn(f'土地の所有者の中に売主が見つからないため、持分は空欄です（借地・共有名義など）。原本で確認してください: {label}')
     lease_docs=[docs[i['id']] for i in items if val(docs[i['id']],'tenure_type')=='leasehold' or val(docs[i['id']],'leasehold.exists') is True]
     if lease_docs:
         if val(data,'leasehold.exists') is not True:data['leasehold']=copy.deepcopy(lease_docs[0]['leasehold'])
