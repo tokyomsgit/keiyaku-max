@@ -23,6 +23,13 @@ def estimate(pages,model=None,config=None):
         return math.ceil(result) if math.isfinite(result) and result>=0 and rate>0 else None
     except (KeyError,TypeError,ValueError):return None
 
+def service_registry(pdf):
+    """True for a 登記情報提供サービス PDF, which the registry reader reads without AI."""
+    from web_registry import reader_root
+    reader_root()
+    from registry_text import is_service_pdf
+    return is_service_pdf(pdf)
+
 def cache_hit(w,kind,digest):
     if kind=='registry':
         from web_registry import cached,reader_root
@@ -166,6 +173,9 @@ def prepare(w,files,cid=None):
                 # Management rules text never leaves this process: scan pages are OCR'd locally
                 # (free) instead of being sent to the AI vision API, regardless of page mode.
                 local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・画像OCR併用（要確認）'
+            elif kind=='registry' and service_registry(pdf):
+                # 登記情報提供サービスの書式は罫線表から読む（extract_registry.extract_by_rules）。AIもAPIキーも使わない。
+                mode='local';note='登記情報提供サービスの書式・機械読み取り'
             elif all(p['mode']=='text' for p in pages) and recognizable and kind in local_kinds:
                 local_result(w,kind,pdf,pages,digest);mode='local';note='テキスト抽出・ローカル処理（要確認）'
             elif all(p['mode']=='text' for p in pages) and not recognizable:

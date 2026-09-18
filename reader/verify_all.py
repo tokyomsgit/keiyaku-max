@@ -74,20 +74,26 @@ def integrate(items,docs):
                     prefix=building_address[:building_address.find(lot_tokens[0])] if lot_tokens else building_address
                     building_lots={prefix+t for t in lot_tokens} or {building_address}
                     if ''.join(key) not in building_lots and ''.join(key) not in (building_address,house_address):
-                        added['needs_review']=True;data['group_review'].append('土地と建物の対応:'+''.join(key))
+                        # Not in the building's 所在: a private road or similar sold with the unit,
+                        # but only when the seller is one of its owners (checked below).
+                        added['outside_site']=''.join(key)
                 current.append(added)
     data['lands']=current
     # Non-land-right condominium ownership shares belong to the current target
     # owner, never to an arbitrary co-owner of the parcel.
     names=[normalize(x) for x in (val(data,'owner.name') or '').splitlines()]
-    if buildings and val(data,'land_right.exists') is False:
-        for land in data['lands']:
-            matched=[p for p in land.get('owners',[]) if normalize(p['name']['value'] or '') in names]
-            if len(names)==1 and len(matched)==1 and not matched[0]['share'].get('needs_review'):
-                p=matched[0]
-                land['right_type']={'value':'所有権','sources':copy.deepcopy(p['name']['sources']),'needs_review':False}
-                land['right_share']=copy.deepcopy(p['share'])
-            elif land.get('owners'):data['group_review'].append('土地共有持分の対象所有者との対応')
+    for land in data['lands']:
+        outside=land.pop('outside_site',None)
+        if not buildings or (not outside and val(data,'land_right.exists') is not False):continue
+        matched=[p for p in land.get('owners',[]) if normalize(p['name']['value'] or '') in names]
+        if len(names)==1 and len(matched)==1 and not matched[0]['share'].get('needs_review'):
+            p=matched[0]
+            land['right_type']={'value':'所有権','sources':copy.deepcopy(p['name']['sources']),'needs_review':False}
+            land['right_share']=copy.deepcopy(p['share'])
+            if outside:data.setdefault('land_warnings',[]).append('建物の所在に載っていない土地を、売主の持分がある土地（私道など）として含めました: '+outside)
+        elif outside and not matched:
+            land['needs_review']=True;data['group_review'].append('土地と建物の対応:'+outside)
+        elif land.get('owners'):data['group_review'].append('土地共有持分の対象所有者との対応')
     lease_docs=[docs[i['id']] for i in items if val(docs[i['id']],'tenure_type')=='leasehold' or val(docs[i['id']],'leasehold.exists') is True]
     if lease_docs:
         if val(data,'leasehold.exists') is not True:data['leasehold']=copy.deepcopy(lease_docs[0]['leasehold'])

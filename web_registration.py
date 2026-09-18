@@ -69,10 +69,26 @@ def uncertain(node):
     return False
 
 
+def blocked_reason(kind,group_review):
+    """Why registration stopped, in words the person uploading can act on."""
+    if kind=='land_only':return '土地の謄本だけでは登録できません。建物（専有部分）の謄本も一緒に入れてください。'
+    if kind=='detached_house':return '戸建ては区分マンション用のひな形の対象外です。'
+    if kind not in ('condominium_land_right','condominium_no_land_right','leasehold_condominium'):
+        return '物件の種類（区分マンションかどうか）を謄本から判定できませんでした。建物の謄本を確認してください。'
+    reasons=[]
+    for g in group_review:
+        if g.startswith('土地と建物の対応:'):reasons.append(f'「{g.split(":",1)[1]}」の土地は、建物の所在に載っておらず、売主も所有者に入っていません。別の物件の謄本でないか確認してください。')
+        elif g=='土地共有持分の対象所有者との対応':reasons.append('売主が複数（共有名義）か、土地の所有者に売主が見つからないため、土地の持分を決められません。')
+        elif g.startswith('資料間不一致:'):reasons.append(f'同じ土地の謄本どうしで内容が違います（{g.split(":",1)[1]}）。')
+        elif g=='複数建物の対象選択':reasons.append('建物の謄本が複数入っています。1物件分だけにしてください。')
+        else:reasons.append(g)
+    return '登録できません。'+' '.join(dict.fromkeys(reasons))
+
+
 def payload_from(data):
     kind=value(node_at(data,'property_type'))
     if kind not in ('condominium_land_right','condominium_no_land_right','leasehold_condominium') or data.get('group_review'):
-        raise StoreError('戸建て・物件種別不明・資料間不一致は登録できません。資料を確認してください。')
+        raise StoreError(blocked_reason(kind,data.get('group_review') or []))
     documents=copy.deepcopy(data.get('registration_documents',[]))
     if not documents:raise StoreError('原本情報がありません。PDFを再選択してください。解析済みデータは再利用します。')
     b={'property_type':kind};u={};fields=[]

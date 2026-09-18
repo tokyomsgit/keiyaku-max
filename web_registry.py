@@ -66,7 +66,7 @@ def case_from(data,cid):
       leasehold_period_years='借地期間',leasehold_assignment_consent='譲渡承諾の要否')
     for f in values:f['label']=LABELS.get(f['code'],f['code'])
     kind=get(data,'property_type');blocked=kind not in ('condominium_land_right','condominium_no_land_right','leasehold_condominium')
-    warnings=list(data.get('group_review',[]))+list(data.get('leasehold_warnings',[]))
+    warnings=list(data.get('group_review',[]))+list(data.get('leasehold_warnings',[]))+list(data.get('land_warnings',[]))
     if blocked:warnings.insert(0,'戸建ては区分マンション用ひな形の対象外です。' if kind=='detached_house' else '物件タイプを確定できないため、Excel生成を停止しました。')
     return {'id':cid,'unit_id':None,'building_name':get(data,'building.name') or '取込資料（物件名未取得）',
       'unit_name':get(data,'unit.name'),'address':get(data,'building.location'),'owner':get(data,'owner.name'),
@@ -105,12 +105,15 @@ def upload(workspace,files):
         folder=workspace.output/'registry_cache'/digest;folder.mkdir(parents=True,exist_ok=True)
         pdf=folder/'source.pdf';pdf.write_bytes(content)
         if data is None:
-            key=env('OPENAI_API_KEY')
-            if not key:raise StoreError('API設定不足：管理者がOPENAI_API_KEYを設定してください。')
-            os.environ['OPENAI_API_KEY']=key
-            from web_ai_cost import permit
-            permit(workspace,'registry',pdf)
-            workspace.ai_calls+=1
+            from registry_text import is_service_pdf
+            # 登記情報提供サービスのPDFは罫線表から読むので、APIキーも料金確認も要らない。
+            if not is_service_pdf(pdf):
+                key=env('OPENAI_API_KEY')
+                if not key:raise StoreError('API設定不足：管理者がOPENAI_API_KEYを設定してください。')
+                os.environ['OPENAI_API_KEY']=key
+                from web_ai_cost import permit
+                permit(workspace,'registry',pdf)
+                workspace.ai_calls+=1
             data=read_existing(extract_registry,pdf,folder)
         docs[str(i)]=copy.deepcopy(data);docs[str(i)].setdefault('metadata',{})
         def tag(node):

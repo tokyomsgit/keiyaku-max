@@ -212,6 +212,23 @@ def prepare_pdf(path, output_dir):
     return pages, content
 
 
+def extract_by_rules(pdf_path, output_dir):
+    """登記情報提供サービスのPDFは罫線表から読む。AI不要・ページ数の上限なし。"""
+    from rule_registry import read
+    from normalize_registry import normalize_document
+    raw, pages = read(pdf_path)
+    save_json(output_dir / "source_pages.json", pages)
+    save_json(output_dir / "rule_raw.json", raw)
+    data = validate_evidence(raw, pages)
+    data = normalize_document(data, pages, str(Path(pdf_path).resolve()), table_read=True)
+    data["metadata"] = {"source_pdf": str(Path(pdf_path).resolve()),
+                        "source_sha256": hashlib.sha256(Path(pdf_path).read_bytes()).hexdigest(),
+                        "model": "rule", "pages": pages, "full_text": True,
+                        "old_numerals": any(p.get("old_numerals") for p in pages)}
+    save_json(output_dir / "extracted.json", data)
+    return data
+
+
 def call_ai(content, model):
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
@@ -312,6 +329,9 @@ def validate_evidence(data, pages):
 
 def extract_registry(pdf_path, output_dir="output", model=None):
     output_dir = Path(output_dir)
+    from registry_text import is_service_pdf
+    if is_service_pdf(pdf_path):
+        return extract_by_rules(pdf_path, output_dir)
     pages, content = prepare_pdf(pdf_path, output_dir / "pages")
     save_json(output_dir / "source_pages.json", pages)
     model = model or os.environ.get("OPENAI_MODEL", "gpt-4.1")
