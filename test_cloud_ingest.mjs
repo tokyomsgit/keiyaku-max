@@ -15,6 +15,7 @@ globalThis.fetch = async (url, options = {}) => {
   return realFetch(url, options);
 };
 process.env.GITHUB_DISPATCH_TOKEN = 'mock';
+process.env.ALLOWED_EMAILS = 'tester@example.com';
 const handler = (await import('./netlify/functions/ingest.mjs')).default;
 const call = async (action, body, method = 'POST', query = '') => {
   const request = new Request(`https://keiyaku-max.netlify.app/.netlify/functions/ingest?action=${action}${query}`, { method, headers: { authorization: 'Bearer test' }, body: body ? JSON.stringify(body) : undefined });

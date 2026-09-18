@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict';
 
 const [caseId] = process.argv.slice(2);
+process.env.ALLOWED_EMAILS = 'tester@example.com';
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
-  if (String(url).startsWith('https://afdtohxuzuwlqmjbrpar.supabase.co/auth/v1/user')) return new Response(JSON.stringify({ id: 'test-user' }), { status: 200 });
+  if (String(url).startsWith('https://afdtohxuzuwlqmjbrpar.supabase.co/auth/v1/user')) return new Response(JSON.stringify({ id: 'test-user', email: 'tester@example.com' }), { status: 200 });
   return realFetch(url, options);
 };
 const handler = (await import('./netlify/functions/review.mjs')).default;

@@ -24,9 +24,19 @@ export async function authenticate(request) {
   const response = await fetch(`${AUTH_URL}/auth/v1/user`, { headers: { apikey: AUTH_KEY, authorization } });
   if (!response.ok) throw new Failure(401, 'ログインし直してください。');
   const user = await response.json();
-  const allowed = (process.env.ALLOWED_EMAILS || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
-  if (allowed.length && !allowed.includes(String(user.email || '').toLowerCase())) throw new Failure(403, 'このアカウントは利用できません。');
+  if (!allowedEmail(user.email, process.env.ALLOWED_EMAILS)) throw new Failure(403, 'このアカウントは利用できません。管理者に利用登録を依頼してください。');
   return user;
+}
+
+// ALLOWED_EMAILS is a comma-separated list of addresses and "@domain" entries
+// (e.g. "@tokyoms.co.jp,someone@gmail.com"). An empty list lets nobody in: anyone can
+// sign in with Google, so an unset list must not mean "everyone".
+export function allowedEmail(email, list) {
+  const address = String(email || '').trim().toLowerCase();
+  const entries = String(list || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+  if (!address.includes('@')) return false;
+  const domain = address.slice(address.lastIndexOf('@'));
+  return entries.some(entry => entry.startsWith('@') ? entry === domain : entry === address);
 }
 
 const RPC_MESSAGES = {

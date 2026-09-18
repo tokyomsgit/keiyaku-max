@@ -1,5 +1,6 @@
 'use strict';
-const API='https://ugnkhzjswjqszmzzpelz.supabase.co/functions/v1/keiyaku-api';
+// Case list and manual creation go through a Netlify function so they share its ALLOWED_EMAILS check.
+const API='/.netlify/functions/cases';
 const root=document.querySelector('#live-app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const display=v=>v===null||v===undefined||v===''?'未取得':typeof v==='number'?v.toLocaleString('ja-JP'):String(v);
