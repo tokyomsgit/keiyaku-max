@@ -602,3 +602,9 @@ a.header-button { text-decoration: none; }
 .guide-steps > li { margin-bottom: var(--space-md); }
 .guide-steps ul { margin-top: var(--space-xs); }
 @media (max-width: 600px) { .guide-table th { white-space: normal; } }
+
+/* 案件一覧の検索欄 */
+.case-search { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.case-search label { font-weight: 700; }
+.case-search input { flex: 1 1 320px; padding: var(--space-sm); font-size: var(--font-size-base); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-md); }
+.case-search input:focus { outline: 2px solid var(--color-primary); border-color: var(--color-primary); }

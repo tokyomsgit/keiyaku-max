@@ -25,7 +25,13 @@ def cached(digest,root,output):
     path=output/'registry_cache'/digest/'extracted.json'
     if path.exists():
         data=json.loads(path.read_text(encoding='utf8'))
-        if data.get('metadata',{}).get('source_sha256')==digest:return data
+        if data.get('metadata',{}).get('source_sha256')==digest:
+            # An AI reading of a 登記情報提供サービス PDF is replaced by the rule reader's on its next use.
+            pdf=path.parent/'source.pdf'
+            if data['metadata'].get('model')!='rule' and pdf.exists():
+                from registry_text import is_service_pdf
+                if is_service_pdf(pdf):return None
+            return data
     return None
 
 
