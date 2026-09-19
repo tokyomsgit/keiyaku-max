@@ -111,9 +111,11 @@ async function start(body, user) {
     if (!caseId) throw new Failure(409, '解析済みの資料から物件を特定できませんでした。');
     return { cached: true, case_id: caseId };
   }
-  const job = { id: crypto.randomUUID(), owner: user.id, status: 'awaiting_upload', message: 'PDFを送信しています。', case_id: caseId, files: missing, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  // Read the whole selection, already-read PDFs included: a new land 謄本 on its own cannot be
+  // registered without the building 謄本 picked with it, and re-reading is local and free now.
+  const job = { id: crypto.randomUUID(), owner: user.id, status: 'awaiting_upload', message: 'PDFを送信しています。', case_id: caseId, files: clean, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   const uploads = [];
-  for (const file of missing) {
+  for (const file of clean) {
     if (await exists(file.hash)) { uploads.push({ hash: file.hash, skip: true }); continue; }
     const response = await storage('POST', `object/upload/sign/${BUCKET}/uploads/${file.hash}.pdf`, '{}', { 'Content-Type': 'application/json' });
     if (!response.ok) throw new Failure(502, 'PDFの送信準備ができませんでした。');
